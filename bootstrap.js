@@ -26,7 +26,7 @@ const provider = initialMode === AppMode.CONNECTING
   : new DemoProvider();
 
 const platform = {
-  version: "5.4-close-preview",
+  version: "6.0-readonly-release",
   initialMode,
   currentMode: initialMode,
   provider,
@@ -66,10 +66,10 @@ function ensureClosePreview() {
   overlay.hidden = true;
   overlay.innerHTML = `
     <section class="modal-card close-preview-card" role="dialog" aria-modal="true" aria-labelledby="closePreviewTitle">
-      <div class="modal-header"><h2 id="closePreviewTitle">Close Position Preview</h2><button id="closePreviewDismiss" type="button" aria-label="Close preview">×</button></div>
+      <div class="modal-header"><h2 id="closePreviewTitle">Close Position Simulation</h2><button id="closePreviewDismiss" type="button" aria-label="Close preview">×</button></div>
       <div id="closePreviewContent"></div>
       <div class="preview-warning"><strong>Simulation only</strong><span>No request will be sent to cTrader. Live position closing remains locked.</span></div>
-      <div class="action-row"><button id="closePreviewCancel" type="button">Back</button><button type="button" disabled>Live Close Locked</button></div>
+      <div class="action-row"><button id="closePreviewCancel" type="button">Back</button><button type="button" disabled>Trading Disabled</button></div>
     </section>`;
   document.body.appendChild(overlay);
   const hide = () => { overlay.hidden = true; };
@@ -109,7 +109,8 @@ function ensureValidationSummary() {
     <div><span>Event stream</span><strong id="validationEvents">Not started</strong></div>
     <div><span>Symbols</span><strong id="validationSymbols">Waiting</strong></div>
     <div><span>Quotes</span><strong id="validationQuotes">Waiting</strong></div>
-    <div><span>Tracked P/L</span><strong id="validationPnl">Waiting</strong></div>`;
+    <div><span>Tracked P/L</span><strong id="validationPnl">Waiting</strong></div>
+    <div><span>Release mode</span><strong>Read-only</strong></div>`;
   banner.after(section);
 }
 

@@ -1,1 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
 
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <meta
+        name="description"
+        content="Mobile position and pending order manager for cTrader"
+    >
+
+    <title>cTrader Mobile Position Manager</title>
+
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <main class="app-shell">
+
+        <header class="app-header">
+            <div>
+                <p class="eyebrow">cTrader Plugin</p>
+                <h1>Position Manager</h1>
+            </div>
+
+            <div
+                id="connectionStatus"
+                class="status disconnected"
+                role="status"
+                aria-live="polite"
+            >
+                Web Preview
+            </div>
+        </header>
+
+        <section class="summary-card">
+            <h2>Account Summary</h2>
+
+            <div class="summary-grid">
+                <div>
+                    <span>Positions</span>
+                    <strong id="

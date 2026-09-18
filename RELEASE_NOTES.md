@@ -1,8 +1,8 @@
-# Version 11.0 Quote Integrity
+# Version 12.0 Auditable P/L
 
-- Requires two consecutive verified ticks before calculating P/L.
-- Detects unrealistic jumps between consecutive normalized quotes.
-- Retains the fixed 100,000 quote divisor.
-- Retains five-second freshness, timestamp, spread and entry-price checks.
-- Exposes raw and normalized quote values in monitoring snapshots for diagnosis.
-- Suppresses P/L while a quote sequence is unverified.
+- Adds expandable P/L calculation details to every tracked position.
+- Shows quote age and consecutive verified-tick count.
+- Separates gross P/L, recorded commission and estimated net P/L.
+- Documents the Buy and Sell calculation formulas.
+- Adds P/L audit data to monitoring snapshots.
+- Retains all Version 11 quote-integrity protections.

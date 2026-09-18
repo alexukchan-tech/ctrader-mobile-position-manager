@@ -428,3 +428,12 @@ input, select {
 /* Version 8.0 resilient monitoring */
 .validation-summary{grid-template-columns:repeat(auto-fit,minmax(118px,1fr))}
 #reconnectMonitoring:not(:disabled){border-color:rgba(47,129,247,.55)}
+
+/* Version 12.0 auditable P/L */
+.pnl-audit{margin-top:10px;padding:10px;border:1px solid var(--border);border-radius:10px;background:rgba(255,255,255,.015)}
+.pnl-audit summary{cursor:pointer;color:#79b8ff;font-weight:700}
+.pnl-audit dl{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:10px 0}
+.pnl-audit dl div{padding:8px;border-radius:8px;background:var(--surface-raised)}
+.pnl-audit dt{color:var(--muted);font-size:10px}.pnl-audit dd{margin:3px 0 0;font-size:12px;font-weight:700;overflow-wrap:anywhere}
+.pnl-audit p{margin:8px 0 0;color:var(--muted);font-size:11px;line-height:1.45}
+@media(max-width:430px){.pnl-audit dl{grid-template-columns:1fr}}

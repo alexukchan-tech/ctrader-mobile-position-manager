@@ -1,5 +1,5 @@
-# cTrader Mobile Position Manager 11.0 Quote Integrity
+# cTrader Mobile Position Manager 12.0 Auditable P/L
 
-Version 11.0 adds a quote-integrity layer. Estimated P/L is calculated only after two consecutive valid quote ticks pass scaling, timestamp, freshness, spread, continuity and entry-price plausibility checks. The first valid tick is displayed as awaiting verification and cannot produce P/L.
+Version 12.0 makes each displayed P/L estimate auditable. The position card exposes the exact exit-side quote, quote age, verified-tick count, price movement, units, gross P/L, recorded commission and estimated net P/L formula.
 
-The monitoring view remains partial and all trading operations remain unavailable.
+P/L remains an estimate. Swap, currency-conversion adjustments, and charges not present in the execution-event record are not included. Invalid, stale or unverified quotes suppress P/L. Trading operations remain unavailable.

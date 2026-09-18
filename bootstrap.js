@@ -26,7 +26,7 @@ const provider = initialMode === AppMode.CONNECTING
   : new DemoProvider();
 
 const platform = {
-  version: "11.0-quote-integrity",
+  version: "12.0-auditable-pnl",
   initialMode,
   currentMode: initialMode,
   provider,
@@ -118,10 +118,10 @@ function ensureValidationSummary() {
     <div><span>Symbols</span><strong id="validationSymbols">Waiting</strong></div>
     <div><span>Quotes</span><strong id="validationQuotes">Waiting</strong></div>
     <div><span>Tracked P/L</span><strong id="validationPnl">Waiting</strong></div>
-    <div><span>Release mode</span><strong>Quote-integrity monitoring</strong></div>
+    <div><span>Release mode</span><strong>Auditable P/L monitoring</strong></div>
     <div><span>Data scope</span><strong id="validationScope">Partial</strong></div>
     <div><span>Quote health</span><strong id="validationQuoteHealth">Waiting</strong></div>
-    <div><span>P/L rule</span><strong>2 verified ticks required</strong></div>
+    <div><span>P/L rule</span><strong>Verified and auditable</strong></div>
     <div><span>Session health</span><strong id="validationSession">Starting</strong></div>
     <div><span>Last refresh</span><strong id="validationRefresh">Never</strong></div>
     <div><span>Storage</span><strong id="validationStorage">Checking</strong></div>
@@ -466,11 +466,31 @@ function addInspector() {
     if (!quote.valid || !Number.isFinite(exitPrice) || !Number.isFinite(Number(position.entryPrice))) {
       return { value: null, quote };
     }
+    const entryPrice = Number(position.entryPrice);
+    const volumeUnits = Number(position.volumeUnits || 0);
+    const commission = Number(position.commission || 0);
     const movement = position.side === "Sell"
-      ? Number(position.entryPrice) - exitPrice
-      : exitPrice - Number(position.entryPrice);
-    const value = movement * Number(position.volumeUnits || 0) + Number(position.commission || 0);
-    return { value, quote };
+      ? entryPrice - exitPrice
+      : exitPrice - entryPrice;
+    const grossPnl = movement * volumeUnits;
+    const value = grossPnl + commission;
+    return {
+      value,
+      quote,
+      audit: {
+        side: position.side,
+        entryPrice,
+        exitPrice,
+        volumeUnits,
+        movement,
+        grossPnl,
+        commission,
+        estimatedNetPnl: value,
+        formula: position.side === "Sell"
+          ? "(entry - ask) * units + commission"
+          : "(bid - entry) * units + commission"
+      }
+    };
   };
 
   const renderPrimaryReadOnlyLists = () => {
@@ -524,8 +544,23 @@ function addInspector() {
             <div><span>Estimated P/L</span><strong>${escapeText(pnlText)}</strong></div>
             <div><span>Live quote</span><strong>${escapeText(quoteText)}</strong></div>
             <div><span>Quote update</span><strong>${escapeText(estimate.quote.updatedAt || "Never")}</strong></div>
+            <div><span>Quote age</span><strong>${escapeText(estimate.quote.ageMs == null ? "Unavailable" : `${estimate.quote.ageMs} ms`)}</strong></div>
+            <div><span>Verified ticks</span><strong>${escapeText(estimate.quote.integrity?.consecutiveValid ?? 0)}</strong></div>
             <div><span>Opened</span><strong>${escapeText(formatTrackedTimestamp(position.openTimestamp))}</strong></div>
           </div>
+          <details class="pnl-audit"><summary>P/L calculation details</summary>
+            <dl>
+              <div><dt>Formula</dt><dd>${escapeText(estimate.audit?.formula || "Unavailable")}</dd></div>
+              <div><dt>Entry</dt><dd>${escapeText(estimate.audit?.entryPrice ?? "Unavailable")}</dd></div>
+              <div><dt>Exit quote</dt><dd>${escapeText(estimate.audit?.exitPrice ?? "Unavailable")}</dd></div>
+              <div><dt>Movement</dt><dd>${escapeText(estimate.audit?.movement ?? "Unavailable")}</dd></div>
+              <div><dt>Units</dt><dd>${escapeText(estimate.audit?.volumeUnits ?? "Unavailable")}</dd></div>
+              <div><dt>Gross P/L</dt><dd>${escapeText(estimate.audit?.grossPnl?.toFixed?.(2) ?? "Unavailable")}</dd></div>
+              <div><dt>Commission included</dt><dd>${escapeText(estimate.audit?.commission?.toFixed?.(2) ?? "Unavailable")}</dd></div>
+              <div><dt>Estimated net P/L</dt><dd>${escapeText(estimate.audit?.estimatedNetPnl?.toFixed?.(2) ?? "Unavailable")}</dd></div>
+            </dl>
+            <p>Swap, broker conversion adjustments, and charges not present in the event record are not included.</p>
+          </details>
           <div class="preview-action-row"><button type="button" class="preview-close-button" data-position-id="${escapeText(position.id)}">Preview Close</button><span>Simulation only. No trading request.</span></div>
           <p class="read-only-note">Event-tracked record only. Live management is locked.</p>
         </article>`;

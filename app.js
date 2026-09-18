@@ -862,3 +862,54 @@ document.addEventListener("DOMContentLoaded", initializeDemo);
     addSettingsButton();
     renderPendingOrders();
 })();
+
+// Demo v3.1: enforce the saved volume-display preference everywhere.
+(function enforceVolumeDisplayPreference() {
+    const SETTINGS_KEY = "ctraderMobilePositionManager.demoSettings.v1";
+
+    function getVolumeDisplay() {
+        try {
+            const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}");
+            return ["units", "lots", "both"].includes(saved.volumeDisplay)
+                ? saved.volumeDisplay
+                : "both";
+        } catch {
+            return "both";
+        }
+    }
+
+    function applyVolumeDisplay(root = document) {
+        const mode = getVolumeDisplay();
+
+        root.querySelectorAll(".details-grid > div").forEach(item => {
+            const label = item.querySelector("span")?.textContent.trim();
+            if (label === "Volume") {
+                item.hidden = mode === "lots";
+            } else if (label === "Lots") {
+                item.hidden = mode === "units";
+            }
+        });
+    }
+
+    // Observe cards and bottom sheets created after page load.
+    const observer = new MutationObserver(mutations => {
+        for (const mutation of mutations) {
+            for (const node of mutation.addedNodes) {
+                if (node.nodeType === Node.ELEMENT_NODE) {
+                    applyVolumeDisplay(node);
+                }
+            }
+        }
+    });
+
+    observer.observe(document.body, { childList: true, subtree: true });
+    applyVolumeDisplay();
+
+    // Reapply immediately after saving or resetting Settings.
+    document.addEventListener("click", event => {
+        if (event.target.closest("#saveSettingsButton") ||
+            event.target.closest("#resetSettingsButton")) {
+            setTimeout(() => applyVolumeDisplay(), 0);
+        }
+    }, true);
+})();

@@ -1,2 +1,3 @@
-# cTrader Mobile Position Manager 4.1 Read-Only Probe
-Use a registered placement URL ending in `?mode=live&showLogs=true`. This build performs the documented handshake, requests account information, and subscribes to execution events. All live trading actions remain locked.
+# cTrader Mobile Position Manager 4.2 Read-Only Diagnostic
+
+This build uses the official SDK logger, reports each handshake stage, applies a 15-second registration timeout, removes synthetic records immediately in Live mode, and keeps every live trading action locked.

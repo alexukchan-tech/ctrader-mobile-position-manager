@@ -1,3 +1,3 @@
-# cTrader Mobile Position Manager 5.1 Read-Only Integration
+# cTrader Mobile Position Manager 5.2 Read-Only Console
 
-This bundled read-only milestone moves event-tracked records into the main Positions and Pending Orders tabs, resolves symbol names, displays live quote freshness, calculates estimated event-tracked floating P/L, and relies on latest status/volume events for lifecycle filtering. The view remains partial because records existing before connection may be missing. All live management actions remain locked.
+This consolidated read-only milestone places event-tracked records in the primary Positions and Pending Orders tabs, adds a persistent Partial Account View warning, collapses detailed SDK diagnostics by default, formats live bid/ask using symbol digits, reports quote freshness, retains session-ledger lifecycle filtering, and keeps every live management action locked.

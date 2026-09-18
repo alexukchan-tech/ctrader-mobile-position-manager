@@ -26,7 +26,7 @@ const provider = initialMode === AppMode.CONNECTING
   : new DemoProvider();
 
 const platform = {
-  version: "5.1-readonly-integration",
+  version: "5.2-readonly-console",
   initialMode,
   currentMode: initialMode,
   provider,
@@ -58,6 +58,17 @@ function setStatus(text, cls) {
   element.className = `status ${cls}`;
 }
 
+function ensurePartialViewBanner() {
+  if (document.getElementById("partialViewBanner")) return;
+  const tabBar = document.querySelector(".tab-bar");
+  if (!tabBar) return;
+  const banner = document.createElement("section");
+  banner.id = "partialViewBanner";
+  banner.className = "partial-view-banner";
+  banner.innerHTML = `<div><strong>Partial Account View</strong><span>Only positions and pending orders observed through execution events are shown. Existing records may be missing.</span></div><span class="read-only-pill">READ-ONLY</span>`;
+  tabBar.before(banner);
+}
+
 function lockLiveInterface() {
   document.getElementById("positionCount").textContent = "--";
   document.getElementById("pendingOrderCount").textContent = "--";
@@ -75,8 +86,13 @@ function addInspector() {
   if (document.getElementById("sdkInspector")) return;
   const section = document.createElement("section");
   section.id = "sdkInspector";
-  section.className = "content-section";
+  section.className = "content-section diagnostic-panel collapsed";
   section.innerHTML = `
+    <button id="toggleDiagnostics" class="diagnostic-toggle" type="button" aria-expanded="false">
+      <span><strong>Connection diagnostics</strong><small id="diagnosticStatusText">Read-only monitor</small></span>
+      <span id="diagnosticChevron">Show</span>
+    </button>
+    <div id="diagnosticBody" class="diagnostic-body" hidden>
     <div class="section-heading"><h2>cTrader SDK Inspector</h2><span>Read-only</span></div>
     <p class="calculation-note">Connection diagnostics and sanitized account response. Trading actions are locked.</p>
     <div class="action-row">
@@ -109,12 +125,10 @@ function addInspector() {
       <button id="clearEventLedger" type="button">Clear Ledger</button>
     </div>
     <pre id="eventLedgerOutput" class="sdk-output">Waiting for execution events...</pre>
-    <p class="field-label sdk-response-label">Event-tracked live lists</p>
-    <div class="ledger-warning">Partial view only. Records that existed before this plugin connected may be missing. Management actions remain locked.</div>
-    <div class="tracked-list-heading"><strong>Tracked open positions</strong><span id="trackedOpenPositionLabel">0</span></div>
-    <div id="trackedPositionList" class="record-list"><div class="empty-state">No event-tracked open positions.</div></div>
-    <div class="tracked-list-heading"><strong>Tracked pending entry orders</strong><span id="trackedPendingOrderLabel">0</span></div>
-    <div id="trackedOrderList" class="record-list"><div class="empty-state">No event-tracked pending entry orders.</div></div>
+    <div id="trackedOpenPositionLabel" hidden>0</div>
+    <div id="trackedPendingOrderLabel" hidden>0</div>
+    <div id="trackedPositionList" hidden></div>
+    <div id="trackedOrderList" hidden></div>
     <p class="field-label sdk-response-label">SDK ServerInterfaces inspector</p>
     <div class="action-row">
       <button id="refreshInterfaceReport" type="button">Refresh Interface Report</button>
@@ -130,8 +144,19 @@ function addInspector() {
       <button id="clearDiscoveryReport" type="button">Clear Report</button>
     </div>
     <p class="calculation-note">These calls request data only. No order, close, cancel, or protection method is invoked.</p>
-    <pre id="sdkDiscoveryOutput" class="sdk-output">Waiting for a probe...</pre>`;
+    <pre id="sdkDiscoveryOutput" class="sdk-output">Waiting for a probe...</pre>
+    </div>`;
   document.querySelector(".app-shell").prepend(section);
+  const toggleDiagnostics = document.getElementById("toggleDiagnostics");
+  const diagnosticBody = document.getElementById("diagnosticBody");
+  const diagnosticChevron = document.getElementById("diagnosticChevron");
+  toggleDiagnostics.onclick = () => {
+    const expanded = toggleDiagnostics.getAttribute("aria-expanded") === "true";
+    toggleDiagnostics.setAttribute("aria-expanded", String(!expanded));
+    diagnosticBody.hidden = expanded;
+    diagnosticChevron.textContent = expanded ? "Show" : "Hide";
+    section.classList.toggle("collapsed", expanded);
+  };
   stageOutput = document.getElementById("sdkStageOutput");
   document.getElementById("retrySdkConnection").onclick = connectReadOnly;
   renderSubscriptionMonitor = () => {
@@ -141,6 +166,8 @@ function addInspector() {
     document.getElementById("lastRawEventAt").textContent = monitor.lastEventAt || "Never";
     document.getElementById("subscriptionError").textContent = monitor.lastError || "None";
     document.getElementById("marketDataStatus").textContent = platform.marketDataStatus;
+    const compact = document.getElementById("diagnosticStatusText");
+    if (compact) compact.textContent = `${monitor.state} | Events ${monitor.rawEventCount} | ${platform.marketDataStatus}`;
   };
   document.getElementById("visibleBuildVersion").textContent = platform.version;
   renderSubscriptionMonitor();
@@ -252,9 +279,12 @@ function addInspector() {
     positionsList.innerHTML = positions.length ? positions.map(position => {
       const estimate = estimatePositionPnl(position);
       const symbolName = platform.marketDataService?.getSymbolName(position.symbolId) || `Symbol ID ${position.symbolId}`;
+      const symbolInfo = platform.marketDataService?.getSymbolInfo(position.symbolId) || {};
+      const symbolDigits = Number(symbolInfo.digits ?? 5);
+      const formatPrice = value => Number.isFinite(Number(value)) ? Number(value).toFixed(symbolDigits) : "Waiting for quote";
       const quoteText = estimate.quote.bid == null
         ? "Waiting for quote"
-        : `Bid ${estimate.quote.bid}${estimate.quote.stale ? " (stale)" : ""}`;
+        : `Bid ${formatPrice(estimate.quote.bid)} | Ask ${formatPrice(estimate.quote.ask)}${estimate.quote.stale ? " | STALE" : ""}`;
       const pnlText = Number.isFinite(estimate.value)
         ? `${estimate.value >= 0 ? "+" : ""}${new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(estimate.value)}`
         : "Unavailable";
@@ -435,6 +465,7 @@ function sanitize(value) {
 async function connectReadOnly() {
   if (initialMode !== AppMode.CONNECTING) return;
   addInspector();
+  ensurePartialViewBanner();
   lockLiveInterface();
   setStatus("Connecting...", "disconnected");
   const retry = document.getElementById("retrySdkConnection");

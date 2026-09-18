@@ -1,3 +1,3 @@
-# cTrader Mobile Position Manager 5.2.1 Symbol Name Fix
+# cTrader Mobile Position Manager 5.4 Close Preview
 
-Fixes symbol mapping for SDK payloads that use PascalCase fields such as `SymbolId`, `SymbolName`, `Name`, and `Digits`. The previous implementation only read camelCase properties, causing tracked cards to remain labelled `Symbol ID 41`. All live management actions remain locked.
+Adds a safe, non-executing Close Position Preview for event-tracked positions. The preview shows the tracked position ID, direction, volume and indicative exit quote, but it never imports or calls the SDK close-position method. All live trading actions remain locked.

@@ -26,7 +26,7 @@ const provider = initialMode === AppMode.CONNECTING
   : new DemoProvider();
 
 const platform = {
-  version: "5.2.1-symbol-name-fix",
+  version: "5.4-close-preview",
   initialMode,
   currentMode: initialMode,
   provider,
@@ -56,6 +56,77 @@ function setStatus(text, cls) {
   if (!element) return;
   element.textContent = text;
   element.className = `status ${cls}`;
+}
+
+function ensureClosePreview() {
+  if (document.getElementById("closePreviewOverlay")) return;
+  const overlay = document.createElement("div");
+  overlay.id = "closePreviewOverlay";
+  overlay.className = "modal-overlay";
+  overlay.hidden = true;
+  overlay.innerHTML = `
+    <section class="modal-card close-preview-card" role="dialog" aria-modal="true" aria-labelledby="closePreviewTitle">
+      <div class="modal-header"><h2 id="closePreviewTitle">Close Position Preview</h2><button id="closePreviewDismiss" type="button" aria-label="Close preview">×</button></div>
+      <div id="closePreviewContent"></div>
+      <div class="preview-warning"><strong>Simulation only</strong><span>No request will be sent to cTrader. Live position closing remains locked.</span></div>
+      <div class="action-row"><button id="closePreviewCancel" type="button">Back</button><button type="button" disabled>Live Close Locked</button></div>
+    </section>`;
+  document.body.appendChild(overlay);
+  const hide = () => { overlay.hidden = true; };
+  document.getElementById("closePreviewDismiss").onclick = hide;
+  document.getElementById("closePreviewCancel").onclick = hide;
+  overlay.onclick = event => { if (event.target === overlay) hide(); };
+}
+
+function showClosePreview(position) {
+  ensureClosePreview();
+  const overlay = document.getElementById("closePreviewOverlay");
+  const symbolName = platform.marketDataService?.getSymbolName(position.symbolId) || `Symbol ID ${position.symbolId}`;
+  const quote = platform.marketDataService?.getQuote(position.symbolId);
+  const exitRaw = position.side === "Sell" ? quote?.ask : quote?.bid;
+  const exitPrice = platform.marketDataService?.normalizeQuotePrice(position.symbolId, exitRaw);
+  document.getElementById("closePreviewContent").innerHTML = `
+    <dl class="preview-grid">
+      <div><dt>Symbol</dt><dd>${symbolName}</dd></div>
+      <div><dt>Position ID</dt><dd>${position.id}</dd></div>
+      <div><dt>Direction</dt><dd>${position.side}</dd></div>
+      <div><dt>Tracked volume</dt><dd>${position.volumeUnits} ${position.measurementUnits}</dd></div>
+      <div><dt>Indicative exit</dt><dd>${exitPrice ?? "Quote unavailable"}</dd></div>
+      <div><dt>Scope</dt><dd>Event-tracked record only</dd></div>
+    </dl>`;
+  overlay.hidden = false;
+}
+
+function ensureValidationSummary() {
+  if (document.getElementById("validationSummary")) return;
+  const banner = document.getElementById("partialViewBanner");
+  if (!banner) return;
+  const section = document.createElement("section");
+  section.id = "validationSummary";
+  section.className = "validation-summary";
+  section.innerHTML = `
+    <div><span>Connection</span><strong id="validationConnection">Connecting</strong></div>
+    <div><span>Event stream</span><strong id="validationEvents">Not started</strong></div>
+    <div><span>Symbols</span><strong id="validationSymbols">Waiting</strong></div>
+    <div><span>Quotes</span><strong id="validationQuotes">Waiting</strong></div>
+    <div><span>Tracked P/L</span><strong id="validationPnl">Waiting</strong></div>`;
+  banner.after(section);
+}
+
+function updateValidationSummary() {
+  const connection = document.getElementById("validationConnection");
+  if (!connection) return;
+  const positions = mapTrackedPositions(platform.eventLedger);
+  const symbolNamesReady = positions.length === 0 || positions.every(position => {
+    const name = platform.marketDataService?.getSymbolName(position.symbolId) || "";
+    return !name.startsWith("Symbol ID");
+  });
+  const quotesReady = positions.length > 0 && positions.every(position => platform.marketDataService?.getQuote(position.symbolId));
+  connection.textContent = platform.currentMode === AppMode.LIVE ? "Read-only connected" : platform.currentMode;
+  document.getElementById("validationEvents").textContent = `${platform.subscriptionMonitor.state}, ${platform.subscriptionMonitor.rawEventCount} event(s)`;
+  document.getElementById("validationSymbols").textContent = symbolNamesReady ? "Mapped" : "Pending";
+  document.getElementById("validationQuotes").textContent = quotesReady ? "Live" : positions.length ? "Pending" : "No tracked positions";
+  document.getElementById("validationPnl").textContent = quotesReady ? "Estimated" : "Waiting for quotes";
 }
 
 function ensurePartialViewBanner() {
@@ -168,6 +239,7 @@ function addInspector() {
     document.getElementById("marketDataStatus").textContent = platform.marketDataStatus;
     const compact = document.getElementById("diagnosticStatusText");
     if (compact) compact.textContent = `${monitor.state} | Events ${monitor.rawEventCount} | ${platform.marketDataStatus}`;
+    updateValidationSummary();
   };
   document.getElementById("visibleBuildVersion").textContent = platform.version;
   renderSubscriptionMonitor();
@@ -305,9 +377,17 @@ function addInspector() {
             <div><span>Quote update</span><strong>${escapeText(estimate.quote.updatedAt || "Never")}</strong></div>
             <div><span>Opened</span><strong>${escapeText(formatTrackedTimestamp(position.openTimestamp))}</strong></div>
           </div>
-          <p class="read-only-note">Event-tracked record only. Management is locked.</p>
+          <div class="preview-action-row"><button type="button" class="preview-close-button" data-position-id="${escapeText(position.id)}">Preview Close</button><span>Simulation only. No trading request.</span></div>
+          <p class="read-only-note">Event-tracked record only. Live management is locked.</p>
         </article>`;
     }).join("") : '<div class="empty-state">No event-tracked open positions. Existing account positions may be missing.</div>';
+
+    positionsList.querySelectorAll(".preview-close-button").forEach(button => {
+      button.onclick = () => {
+        const position = positions.find(item => String(item.id) === button.dataset.positionId);
+        if (position) showClosePreview(position);
+      };
+    });
 
     ordersList.innerHTML = orders.length ? orders.map(order => {
       const symbolName = platform.marketDataService?.getSymbolName(order.symbolId) || `Symbol ID ${order.symbolId}`;
@@ -339,6 +419,7 @@ function addInspector() {
     ledgerOutput.textContent = report.events.length ? JSON.stringify(report, null, 2) : "Waiting for execution events...";
     renderTrackedLists();
     renderPrimaryReadOnlyLists();
+    updateValidationSummary();
   };
   document.getElementById("copyEventLedger").onclick = async () => {
     const text = JSON.stringify(platform.eventLedger.export(), null, 2);
@@ -467,6 +548,8 @@ async function connectReadOnly() {
   if (initialMode !== AppMode.CONNECTING) return;
   addInspector();
   ensurePartialViewBanner();
+  ensureValidationSummary();
+  ensureClosePreview();
   lockLiveInterface();
   setStatus("Connecting...", "disconnected");
   const retry = document.getElementById("retrySdkConnection");

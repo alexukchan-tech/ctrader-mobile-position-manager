@@ -1,6 +1,8 @@
-# Version 13.0.1 Adaptive Quote Final
+# Version 13.1 Production Read-Only
 
-- Supports both `4379.02` and `437902000` as valid representations of approximately 4379.02.
-- Selects the candidate closest to the position entry price or previous verified quote.
-- Retains two-tick continuity, timestamp, freshness, spread, and plausibility validation.
-- Replaces the misleading `implausible price` message with `no plausible quote representation`.
+- Promotes the validated Version 13.0.1 adaptive-quote build to production.
+- Supports normalized decimal and fixed-five-decimal integer quote representations.
+- Requires current-session position confirmation and two verified quote ticks before P/L.
+- Retains timestamp, freshness, spread, continuity and entry-price plausibility checks.
+- Retains auditable Buy/Sell P/L calculations and local monitoring exports.
+- Keeps all trading actions unavailable because account coverage is partial.

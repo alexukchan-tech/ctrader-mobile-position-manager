@@ -26,7 +26,7 @@ const provider = initialMode === AppMode.CONNECTING
   : new DemoProvider();
 
 const platform = {
-  version: "13.0.1-adaptive-quote-final",
+  version: "13.1-production-readonly",
   initialMode,
   currentMode: initialMode,
   provider,
@@ -118,7 +118,7 @@ function ensureValidationSummary() {
     <div><span>Symbols</span><strong id="validationSymbols">Waiting</strong></div>
     <div><span>Quotes</span><strong id="validationQuotes">Waiting</strong></div>
     <div><span>Tracked P/L</span><strong id="validationPnl">Waiting</strong></div>
-    <div><span>Release mode</span><strong>Final adaptive-quote hotfix</strong></div>
+    <div><span>Release mode</span><strong>Production read-only</strong></div>
     <div><span>Data scope</span><strong id="validationScope">Partial</strong></div>
     <div><span>Quote health</span><strong id="validationQuoteHealth">Waiting</strong></div>
     <div><span>P/L rule</span><strong>Verified, current-session only</strong></div>

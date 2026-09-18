@@ -1,145 +1,47 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Mobile position and pending order manager for cTrader">
-
-    <title>cTrader Mobile Position Manager</title>
-
-    <link rel="stylesheet" href="styles.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Mobile position and pending order manager for cTrader">
+  <title>cTrader Mobile Position Manager</title>
+  <link rel="stylesheet" href="styles.css">
 </head>
-
 <body>
-    <main class="app-shell">
-        <header class="app-header">
-            <div>
-                <p class="eyebrow">cTrader Plugin</p>
-                <h1>Position Manager</h1>
-            </div>
-
-            <div
-                id="connectionStatus"
-                class="status disconnected"
-                role="status"
-                aria-live="polite"
-            >
-                Web Preview
-            </div>
-        </header>
-
-        <section class="summary-card" aria-labelledby="summaryHeading">
-            <h2 id="summaryHeading">Account Summary</h2>
-
-            <div class="summary-grid">
-                <div class="summary-item">
-                    <span>Positions</span>
-                    <strong id="positionCount">0</strong>
-                </div>
-
-                <div class="summary-item">
-                    <span>Pending Orders</span>
-                    <strong id="pendingOrderCount">0</strong>
-                </div>
-
-                <div class="summary-item">
-                    <span>Floating P/L</span>
-                    <strong id="floatingProfit">--</strong>
-                </div>
-            </div>
-        </section>
-
-        <nav class="tab-bar" aria-label="Trading records">
-            <button
-                id="positionsTab"
-                class="tab-button active"
-                type="button"
-                role="tab"
-                aria-selected="true"
-                aria-controls="positionsView"
-            >
-                Positions
-            </button>
-
-            <button
-                id="ordersTab"
-                class="tab-button"
-                type="button"
-                role="tab"
-                aria-selected="false"
-                aria-controls="ordersView"
-            >
-                Pending Orders
-            </button>
-        </nav>
-
-        <section
-            id="positionsView"
-            class="content-section"
-            role="tabpanel"
-            aria-labelledby="positionsTab"
-        >
-            <div class="section-heading">
-                <h2>Open Positions</h2>
-                <span id="positionsStatus">Not connected</span>
-            </div>
-
-            <div id="positionsList" class="record-list">
-                <div class="empty-state">
-                    Connect this webpage to cTrader to display open positions.
-                </div>
-            </div>
-        </section>
-
-        <section
-            id="ordersView"
-            class="content-section hidden"
-            role="tabpanel"
-            aria-labelledby="ordersTab"
-            hidden
-        >
-            <div class="section-heading">
-                <h2>Pending Orders</h2>
-                <span id="ordersStatus">Not connected</span>
-            </div>
-
-            <div id="ordersList" class="record-list">
-                <div class="empty-state">
-                    Connect this webpage to cTrader to display pending orders.
-                </div>
-            </div>
-        </section>
-
-        <section class="danger-zone" aria-labelledby="positionClosingHeading">
-            <h2 id="positionClosingHeading">Position Closing</h2>
-
-            <p>
-                Closing controls will be enabled after account connectivity
-                and position retrieval have been verified.
-            </p>
-
-            <button
-                id="closeSymbolButton"
-                type="button"
-                disabled
-            >
-                Close All for Symbol
-            </button>
-
-            <button
-                id="closeAllButton"
-                type="button"
-                disabled
-            >
-                Close All Positions
-            </button>
-        </section>
-    </main>
-
-    <noscript>
-        This application requires JavaScript to display and manage cTrader positions.
-    </noscript>
-
-    <script src="app.js" defer></script>
+  <main class="app-shell">
+    <header class="app-header">
+      <div><p class="eyebrow">cTrader Plugin</p><h1>Position Manager</h1></div>
+      <div id="connectionStatus" class="status disconnected" role="status" aria-live="polite">Web Preview</div>
+    </header>
+    <section class="summary-card" aria-labelledby="summaryHeading">
+      <h2 id="summaryHeading">Account Summary</h2>
+      <div class="summary-grid">
+        <div class="summary-item"><span>Positions</span><strong id="positionCount">0</strong></div>
+        <div class="summary-item"><span>Pending Orders</span><strong id="pendingOrderCount">0</strong></div>
+        <div class="summary-item"><span>Floating P/L</span><strong id="floatingProfit">--</strong></div>
+      </div>
+    </section>
+    <nav class="tab-bar" aria-label="Trading records">
+      <button id="positionsTab" class="tab-button active" type="button" role="tab" aria-selected="true" aria-controls="positionsView">Positions</button>
+      <button id="ordersTab" class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="ordersView">Pending Orders</button>
+    </nav>
+    <section id="positionsView" class="content-section" role="tabpanel" aria-labelledby="positionsTab">
+      <div class="section-heading"><h2>Open Positions</h2><span id="positionsStatus">Not connected</span></div>
+      <div id="positionsList" class="record-list"><div class="empty-state">Connect this webpage to cTrader to display open positions.</div></div>
+    </section>
+    <section id="ordersView" class="content-section hidden" role="tabpanel" aria-labelledby="ordersTab" hidden>
+      <div class="section-heading"><h2>Pending Orders</h2><span id="ordersStatus">Not connected</span></div>
+      <div id="ordersList" class="record-list"><div class="empty-state">Connect this webpage to cTrader to display pending orders.</div></div>
+    </section>
+    <section class="danger-zone" aria-labelledby="positionClosingHeading">
+      <h2 id="positionClosingHeading">Position Closing</h2>
+      <p>Closing controls will be enabled after account connectivity and position retrieval have been verified.</p>
+      <button id="closeSymbolButton" type="button" disabled>Close All for Symbol</button>
+      <button id="closeAllButton" type="button" disabled>Close All Positions</button>
+    </section>
+  </main>
+  <noscript>This application requires JavaScript to display and manage cTrader positions.</noscript>
+  <script type="module" src="bootstrap.js"></script>
+  <script src="app.js" defer></script>
 </body>
 </html>

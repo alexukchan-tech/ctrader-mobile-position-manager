@@ -1,8 +1,11 @@
-# Version 12.0 Auditable P/L
+# Version 13.0 Final Production Read-Only
 
-- Adds expandable P/L calculation details to every tracked position.
-- Shows quote age and consecutive verified-tick count.
-- Separates gross P/L, recorded commission and estimated net P/L.
-- Documents the Buy and Sell calculation formulas.
-- Adds P/L audit data to monitoring snapshots.
-- Retains all Version 11 quote-integrity protections.
+## Final additions
+- Restored records are marked unconfirmed and cannot produce P/L until reconfirmed by a current-session execution event.
+- Reconnection disposes the old quote subscription, clears quote integrity state, and replaces the execution subscription.
+- Overall health includes verified quote-sequence health for current-session positions.
+- Automated regression tests cover XAUUSD, EURUSD, USDJPY and BTCUSD scaling, Buy/Sell P/L, commission, lifecycle updates, pending-order filtering, session restoration and sensitive-field redaction.
+- Legacy demo archives, sample account data and build scripts are removed.
+
+## Permanent boundary
+This is a partial monitoring view. Close, partial close, breakeven, protection changes, order cancellation, order creation and batch operations are unavailable.

@@ -41,7 +41,8 @@ export function mapTrackedPositions(ledger) {
         openTimestamp: trade.openTimestamp ?? null,
         lastUpdateTimestamp: position.utcLastUpdateTimestamp ?? null,
         lastReceivedAt: record.lastReceivedAt,
-        source: record.source
+        source: record.source,
+        confirmationState: record.confirmationState || "current-session-observed"
       };
     })
     .filter(position => position.positionStatus === POSITION_OPEN && position.volumeUnits > 0)
@@ -74,7 +75,8 @@ export function mapTrackedPendingOrders(ledger) {
         openTimestamp: trade.openTimestamp ?? null,
         lastUpdateTimestamp: order.utcLastUpdateTimestamp ?? null,
         lastReceivedAt: record.lastReceivedAt,
-        source: record.source
+        source: record.source,
+        confirmationState: record.confirmationState || "current-session-observed"
       };
     })
     .filter(order => order.orderStatus === ORDER_ACCEPTED && !order.closingOrder && PENDING_ENTRY_TYPES.has(order.orderTypeCode))

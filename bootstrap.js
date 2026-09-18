@@ -26,7 +26,7 @@ const provider = initialMode === AppMode.CONNECTING
   : new DemoProvider();
 
 const platform = {
-  version: "12.0-auditable-pnl",
+  version: "13.0-final-production-readonly",
   initialMode,
   currentMode: initialMode,
   provider,
@@ -118,10 +118,10 @@ function ensureValidationSummary() {
     <div><span>Symbols</span><strong id="validationSymbols">Waiting</strong></div>
     <div><span>Quotes</span><strong id="validationQuotes">Waiting</strong></div>
     <div><span>Tracked P/L</span><strong id="validationPnl">Waiting</strong></div>
-    <div><span>Release mode</span><strong>Auditable P/L monitoring</strong></div>
+    <div><span>Release mode</span><strong>Final production read-only</strong></div>
     <div><span>Data scope</span><strong id="validationScope">Partial</strong></div>
     <div><span>Quote health</span><strong id="validationQuoteHealth">Waiting</strong></div>
-    <div><span>P/L rule</span><strong>Verified and auditable</strong></div>
+    <div><span>P/L rule</span><strong>Verified, current-session only</strong></div>
     <div><span>Session health</span><strong id="validationSession">Starting</strong></div>
     <div><span>Last refresh</span><strong id="validationRefresh">Never</strong></div>
     <div><span>Storage</span><strong id="validationStorage">Checking</strong></div>
@@ -161,7 +161,12 @@ function updateValidationSummary() {
   const healthyConnection = platform.currentMode === AppMode.LIVE;
   const healthyEvents = platform.subscriptionMonitor.state === "Active";
   const healthyMarket = !String(platform.marketDataStatus).startsWith("Error");
-  document.getElementById("validationOverall").textContent = healthyConnection && healthyEvents && healthyMarket
+  const currentPositions = positions.filter(position => position.confirmationState === "current-session-observed");
+  const healthyQuotes = currentPositions.length === 0 || currentPositions.every(position => {
+    const integrity = platform.marketDataService?.getQuoteIntegrity(position.symbolId);
+    return integrity?.consecutiveValid >= 2;
+  });
+  document.getElementById("validationOverall").textContent = healthyConnection && healthyEvents && healthyMarket && healthyQuotes
     ? "Healthy"
     : "Attention required";
 }
@@ -372,7 +377,7 @@ function addInspector() {
   }
 
   const restoredEvents = loadSessionEvents();
-  restoredEvents.forEach(event => platform.eventLedger.ingest(event));
+  restoredEvents.forEach(event => platform.eventLedger.ingest(event, { restored: true }));
   platform.subscriptionMonitor.rawEventCount = restoredEvents.length;
   if (restoredEvents.length) platform.subscriptionMonitor.lastEventAt = "Restored from session";
 
@@ -462,6 +467,9 @@ function addInspector() {
 
   const estimatePositionPnl = position => {
     const quote = quoteSnapshot(position);
+    if (position.confirmationState !== "current-session-observed") {
+      return { value: null, quote: { ...quote, valid: false, reason: "restored position not reconfirmed" }, audit: null };
+    }
     const exitPrice = position.side === "Sell" ? quote.ask : quote.bid;
     if (!quote.valid || !Number.isFinite(exitPrice) || !Number.isFinite(Number(position.entryPrice))) {
       return { value: null, quote };
@@ -534,7 +542,7 @@ function addInspector() {
         <article class="record-card tracked-card">
           <div class="record-header">
             <div><div class="record-title-row"><h3>${escapeText(symbolName)}</h3><span class="trade-badge ${position.side.toLowerCase()}">${escapeText(position.side)}</span></div><p class="record-id">Position #${escapeText(position.id)}</p></div>
-            <span class="source-badge">Partial live view</span>
+            <span class="source-badge">${position.confirmationState === "current-session-observed" ? "Current session" : "Restored, unconfirmed"}</span>
           </div>
           <div class="details-grid">
             <div><span>Volume</span><strong>${escapeText(formatTrackedVolume(position))}</strong></div>
@@ -562,7 +570,7 @@ function addInspector() {
             <p>Swap, broker conversion adjustments, and charges not present in the event record are not included.</p>
           </details>
           <div class="preview-action-row"><button type="button" class="preview-close-button" data-position-id="${escapeText(position.id)}">Preview Close</button><span>Simulation only. No trading request.</span></div>
-          <p class="read-only-note">Event-tracked record only. Live management is locked.</p>
+          <p class="read-only-note">${position.confirmationState === "current-session-observed" ? "Current-session event observed." : "Restored from a previous session and not yet reconfirmed."} Live management is locked.</p>
         </article>`;
     }).join("") : '<div class="empty-state">No event-tracked open positions. Existing account positions may be missing.</div>';
 
@@ -758,6 +766,8 @@ async function connectReadOnly() {
     copy.disabled = false;
     copy.removeAttribute("disabled");
     copy.setAttribute("aria-disabled", "false");
+    platform.marketDataService?.dispose?.();
+    platform.marketDataService = null;
     platform.marketDataStatus = "Starting";
     renderSubscriptionMonitor();
     platform.marketDataService = new MarketDataService({

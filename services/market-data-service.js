@@ -176,6 +176,14 @@ export class MarketDataService {
     return this.quoteIntegrity.get(String(symbolId)) || null;
   }
 
+  dispose() {
+    this.quoteSubscription?.unsubscribe?.();
+    this.quoteSubscription = null;
+    this.quotes.clear();
+    this.quoteIntegrity.clear();
+    this.subscribedIds.clear();
+  }
+
   normalizeQuotePrice(symbolId, rawPrice) {
     if (rawPrice === null || rawPrice === undefined) return null;
     const numeric = Number(rawPrice);

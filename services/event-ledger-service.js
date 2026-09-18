@@ -43,7 +43,7 @@ export class EventLedger {
     this.orders = new Map();
   }
 
-  ingest(rawEvent) {
+  ingest(rawEvent, { restored = false } = {}) {
     const event = sanitizeEvent(rawEvent);
     const wrapped = { receivedAt: new Date().toISOString(), event };
     this.events.unshift(wrapped);
@@ -56,7 +56,8 @@ export class EventLedger {
 
     if (position && positionId) {
       this.positions.set(positionId, {
-        source: "Execution event",
+        source: restored ? "Restored session event" : "Current execution event",
+        confirmationState: restored ? "restored-unconfirmed" : "current-session-observed",
         lastReceivedAt: wrapped.receivedAt,
         data: position
       });
@@ -64,7 +65,8 @@ export class EventLedger {
 
     if (order && orderId) {
       this.orders.set(orderId, {
-        source: "Execution event",
+        source: restored ? "Restored session event" : "Current execution event",
+        confirmationState: restored ? "restored-unconfirmed" : "current-session-observed",
         lastReceivedAt: wrapped.receivedAt,
         data: order
       });

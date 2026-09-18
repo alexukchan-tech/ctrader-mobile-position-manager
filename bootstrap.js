@@ -26,7 +26,7 @@ const provider = initialMode === AppMode.CONNECTING
   : new DemoProvider();
 
 const platform = {
-  version: "5.0.1-monitor-scope-fix",
+  version: "5.1-readonly-integration",
   initialMode,
   currentMode: initialMode,
   provider,
@@ -201,6 +201,103 @@ function addInspector() {
         <button type="button" disabled>Order Action Locked</button>
       </article>`).join("") : '<div class="empty-state">No event-tracked pending entry orders.</div>';
   };
+  const quoteSnapshot = record => {
+    const service = platform.marketDataService;
+    const quote = service?.getQuote(record.symbolId);
+    if (!service || !quote) return { bid: null, ask: null, updatedAt: null, stale: true };
+    const bid = service.normalizeQuotePrice(record.symbolId, quote.bid);
+    const ask = service.normalizeQuotePrice(record.symbolId, quote.ask);
+    const timestamp = Number(quote.timestamp || quote.utcTimestamp || Date.now());
+    const updatedAt = Number.isFinite(timestamp) ? new Date(timestamp).toLocaleTimeString() : "Unknown";
+    return { bid, ask, updatedAt, stale: Number.isFinite(timestamp) ? Date.now() - timestamp > 15000 : false };
+  };
+
+  const estimatePositionPnl = position => {
+    const quote = quoteSnapshot(position);
+    const exitPrice = position.side === "Sell" ? quote.ask : quote.bid;
+    if (!Number.isFinite(exitPrice) || !Number.isFinite(Number(position.entryPrice))) {
+      return { value: null, quote };
+    }
+    const movement = position.side === "Sell"
+      ? Number(position.entryPrice) - exitPrice
+      : exitPrice - Number(position.entryPrice);
+    const value = movement * Number(position.volumeUnits || 0) + Number(position.commission || 0);
+    return { value, quote };
+  };
+
+  const renderPrimaryReadOnlyLists = () => {
+    const positions = mapTrackedPositions(platform.eventLedger);
+    const orders = mapTrackedPendingOrders(platform.eventLedger);
+    const positionsList = document.getElementById("positionsList");
+    const ordersList = document.getElementById("ordersList");
+    const positionCount = document.getElementById("positionCount");
+    const pendingOrderCount = document.getElementById("pendingOrderCount");
+    const floatingProfit = document.getElementById("floatingProfit");
+    const positionsStatus = document.getElementById("positionsStatus");
+    const ordersStatus = document.getElementById("ordersStatus");
+
+    positionCount.textContent = String(positions.length);
+    pendingOrderCount.textContent = String(orders.length);
+    positionsStatus.textContent = `${positions.length} event-tracked, partial view`;
+    ordersStatus.textContent = `${orders.length} event-tracked, partial view`;
+
+    const pnlValues = positions.map(estimatePositionPnl);
+    const completePnl = pnlValues.length > 0 && pnlValues.every(item => Number.isFinite(item.value));
+    const totalPnl = pnlValues.reduce((sum, item) => sum + (Number.isFinite(item.value) ? item.value : 0), 0);
+    floatingProfit.textContent = completePnl
+      ? `${totalPnl >= 0 ? "+" : ""}${new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(totalPnl)} est.`
+      : "Waiting for quotes";
+    floatingProfit.className = completePnl ? (totalPnl >= 0 ? "profit" : "loss") : "";
+
+    positionsList.innerHTML = positions.length ? positions.map(position => {
+      const estimate = estimatePositionPnl(position);
+      const symbolName = platform.marketDataService?.getSymbolName(position.symbolId) || `Symbol ID ${position.symbolId}`;
+      const quoteText = estimate.quote.bid == null
+        ? "Waiting for quote"
+        : `Bid ${estimate.quote.bid}${estimate.quote.stale ? " (stale)" : ""}`;
+      const pnlText = Number.isFinite(estimate.value)
+        ? `${estimate.value >= 0 ? "+" : ""}${new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(estimate.value)}`
+        : "Unavailable";
+      return `
+        <article class="record-card tracked-card">
+          <div class="record-header">
+            <div><div class="record-title-row"><h3>${escapeText(symbolName)}</h3><span class="trade-badge ${position.side.toLowerCase()}">${escapeText(position.side)}</span></div><p class="record-id">Position #${escapeText(position.id)}</p></div>
+            <span class="source-badge">Partial live view</span>
+          </div>
+          <div class="details-grid">
+            <div><span>Volume</span><strong>${escapeText(formatTrackedVolume(position))}</strong></div>
+            <div><span>Entry</span><strong>${escapeText(position.entryPrice ?? "Unavailable")}</strong></div>
+            <div><span>Stop Loss</span><strong>${escapeText(position.stopLoss ?? "Not set")}</strong></div>
+            <div><span>Take Profit</span><strong>${escapeText(position.takeProfit ?? "Not set")}</strong></div>
+            <div><span>Estimated P/L</span><strong>${escapeText(pnlText)}</strong></div>
+            <div><span>Live quote</span><strong>${escapeText(quoteText)}</strong></div>
+            <div><span>Quote update</span><strong>${escapeText(estimate.quote.updatedAt || "Never")}</strong></div>
+            <div><span>Opened</span><strong>${escapeText(formatTrackedTimestamp(position.openTimestamp))}</strong></div>
+          </div>
+          <p class="read-only-note">Event-tracked record only. Management is locked.</p>
+        </article>`;
+    }).join("") : '<div class="empty-state">No event-tracked open positions. Existing account positions may be missing.</div>';
+
+    ordersList.innerHTML = orders.length ? orders.map(order => {
+      const symbolName = platform.marketDataService?.getSymbolName(order.symbolId) || `Symbol ID ${order.symbolId}`;
+      return `
+        <article class="record-card tracked-card">
+          <div class="record-header">
+            <div><div class="record-title-row"><h3>${escapeText(symbolName)}</h3><span class="order-badge">${escapeText(order.side)} ${escapeText(order.orderType)}</span></div><p class="record-id">Order #${escapeText(order.id)}</p></div>
+            <span class="source-badge">Partial live view</span>
+          </div>
+          <div class="details-grid">
+            <div><span>Volume</span><strong>${escapeText(formatTrackedVolume(order))}</strong></div>
+            <div><span>Entry</span><strong>${escapeText(order.entryPrice ?? "Unavailable")}</strong></div>
+            <div><span>Stop Loss</span><strong>${escapeText(order.stopLoss ?? "Not set")}</strong></div>
+            <div><span>Take Profit</span><strong>${escapeText(order.takeProfit ?? "Not set")}</strong></div>
+            <div><span>Created</span><strong>${escapeText(formatTrackedTimestamp(order.openTimestamp))}</strong></div>
+            <div><span>Status</span><strong>Accepted, action locked</strong></div>
+          </div>
+        </article>`;
+    }).join("") : '<div class="empty-state">No event-tracked pending entry orders. Existing account orders may be missing.</div>';
+  };
+
   renderEventLedger = () => {
     const report = platform.eventLedger.export();
     const openPositions = mapTrackedPositions(platform.eventLedger);
@@ -210,6 +307,7 @@ function addInspector() {
     document.getElementById("capturedEventCount").textContent = String(report.events.length);
     ledgerOutput.textContent = report.events.length ? JSON.stringify(report, null, 2) : "Waiting for execution events...";
     renderTrackedLists();
+    renderPrimaryReadOnlyLists();
   };
   document.getElementById("copyEventLedger").onclick = async () => {
     const text = JSON.stringify(platform.eventLedger.export(), null, 2);

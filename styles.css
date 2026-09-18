@@ -391,3 +391,9 @@ input, select {
 
 /* Version 5.0 symbol and quote mapping */
 .monitor-grid strong{font-variant-numeric:tabular-nums}
+
+
+/* Version 5.1 bundled read-only integration */
+.summary-item strong.profit { color: #3fb950; }
+.summary-item strong.loss { color: #f85149; }
+.read-only-note { margin: 8px 0 0; color: var(--muted); font-size: 12px; line-height: 1.45; }

@@ -1,3 +1,4 @@
+import { MarketDataService } from "./services/market-data-service.js";
 import { loadSessionEvents, saveSessionEvents, clearSessionEvents } from "./services/session-event-store.js";
 import { mapTrackedPositions, mapTrackedPendingOrders } from "./services/event-list-mapper.js";
 import { EventLedger } from "./services/event-ledger-service.js";
@@ -24,7 +25,7 @@ const provider = initialMode === AppMode.CONNECTING
   : new DemoProvider();
 
 const platform = {
-  version: "4.9-subscription-monitor",
+  version: "5.0-symbol-quotes",
   initialMode,
   currentMode: initialMode,
   provider,
@@ -38,6 +39,8 @@ const platform = {
   discoveryService: null,
   discoveryCaptures: [],
   eventLedger: new EventLedger({ maximumEvents: 100 }),
+  marketDataService: null,
+  marketDataStatus: "Not started",
   subscriptionMonitor: {
     state: "Not started",
     rawEventCount: 0,
@@ -85,9 +88,10 @@ function addInspector() {
     <pre id="sdkOutput" class="sdk-output">Waiting for account information...</pre>
     <p class="field-label sdk-response-label">Build and subscription monitor</p>
     <div class="monitor-grid">
-      <div><span>Build</span><strong id="visibleBuildVersion">4.9-subscription-monitor</strong></div>
+      <div><span>Build</span><strong id="visibleBuildVersion">5.0-symbol-quotes</strong></div>
       <div><span>Execution subscription</span><strong id="subscriptionState">Not started</strong></div>
       <div><span>Raw events received</span><strong id="rawEventCount">0</strong></div>
+      <div><span>Market data</span><strong id="marketDataStatus">Not started</strong></div>
       <div><span>Last event received</span><strong id="lastRawEventAt">Never</strong></div>
       <div class="monitor-wide"><span>Subscription error</span><strong id="subscriptionError">None</strong></div>
     </div>
@@ -135,6 +139,7 @@ function addInspector() {
     document.getElementById("rawEventCount").textContent = String(monitor.rawEventCount);
     document.getElementById("lastRawEventAt").textContent = monitor.lastEventAt || "Never";
     document.getElementById("subscriptionError").textContent = monitor.lastError || "None";
+    document.getElementById("marketDataStatus").textContent = platform.marketDataStatus;
   };
   renderSubscriptionMonitor();
   document.getElementById("resetSessionLedger").onclick = () => {
@@ -168,7 +173,7 @@ function addInspector() {
     document.getElementById("trackedPendingOrderLabel").textContent = String(orders.length);
     document.getElementById("trackedPositionList").innerHTML = positions.length ? positions.map(position => `
       <article class="record-card tracked-card">
-        <div class="record-header"><div><div class="record-title-row"><h3>Symbol ID ${escapeText(position.symbolId)}</h3><span class="trade-badge ${position.side.toLowerCase()}">${escapeText(position.side)}</span></div><p class="record-id">Position #${escapeText(position.id)}</p></div><span class="source-badge">Execution event</span></div>
+        <div class="record-header"><div><div class="record-title-row"><h3>${escapeText(platform.marketDataService?.getSymbolName(position.symbolId) || `Symbol ID ${position.symbolId}`)}</h3><span class="trade-badge ${position.side.toLowerCase()}">${escapeText(position.side)}</span></div><p class="record-id">Position #${escapeText(position.id)}</p></div><span class="source-badge">Execution event</span></div>
         <div class="details-grid">
           <div><span>Volume</span><strong>${escapeText(formatTrackedVolume(position))}</strong></div>
           <div><span>Entry</span><strong>${escapeText(position.entryPrice ?? "Not available")}</strong></div>
@@ -176,12 +181,13 @@ function addInspector() {
           <div><span>Take Profit</span><strong>${escapeText(position.takeProfit ?? "Not set")}</strong></div>
           <div><span>Commission</span><strong>${escapeText(position.commission)}</strong></div>
           <div><span>Opened</span><strong>${escapeText(formatTrackedTimestamp(position.openTimestamp))}</strong></div>
+          <div><span>Live Bid</span><strong>${escapeText((() => { const quote = platform.marketDataService?.getQuote(position.symbolId); const price = platform.marketDataService?.normalizeQuotePrice(position.symbolId, quote?.bid); return price ?? "Waiting for quote"; })())}</strong></div>
         </div>
         <button type="button" disabled>Management Locked</button>
       </article>`).join("") : '<div class="empty-state">No event-tracked open positions.</div>';
     document.getElementById("trackedOrderList").innerHTML = orders.length ? orders.map(order => `
       <article class="record-card tracked-card">
-        <div class="record-header"><div><div class="record-title-row"><h3>Symbol ID ${escapeText(order.symbolId)}</h3><span class="order-badge">${escapeText(order.side)} ${escapeText(order.orderType)}</span></div><p class="record-id">Order #${escapeText(order.id)}</p></div><span class="source-badge">Execution event</span></div>
+        <div class="record-header"><div><div class="record-title-row"><h3>${escapeText(platform.marketDataService?.getSymbolName(order.symbolId) || `Symbol ID ${order.symbolId}`)}</h3><span class="order-badge">${escapeText(order.side)} ${escapeText(order.orderType)}</span></div><p class="record-id">Order #${escapeText(order.id)}</p></div><span class="source-badge">Execution event</span></div>
         <div class="details-grid">
           <div><span>Volume</span><strong>${escapeText(formatTrackedVolume(order))}</strong></div>
           <div><span>Entry</span><strong>${escapeText(order.entryPrice ?? "Not available")}</strong></div>
@@ -347,6 +353,24 @@ async function connectReadOnly() {
     copy.disabled = false;
     copy.removeAttribute("disabled");
     copy.setAttribute("aria-disabled", "false");
+    platform.marketDataStatus = "Starting";
+    renderSubscriptionMonitor();
+    platform.marketDataService = new MarketDataService({
+      adapter: provider.adapter,
+      logger,
+      onStatus: status => {
+        platform.marketDataStatus = status;
+        renderSubscriptionMonitor();
+      },
+      onQuote: () => renderEventLedger()
+    });
+    try {
+      await platform.marketDataService.initialize();
+    } catch (marketDataError) {
+      platform.marketDataStatus = `Error: ${marketDataError?.message || String(marketDataError)}`;
+      renderSubscriptionMonitor();
+    }
+
     platform.subscriptionMonitor.state = "Starting";
     platform.subscriptionMonitor.lastError = null;
     renderSubscriptionMonitor();
@@ -364,6 +388,15 @@ async function connectReadOnly() {
         const result = platform.eventLedger.ingest(event);
         logger.info("Execution event received", result);
         renderEventLedger();
+        const trackedPositions = mapTrackedPositions(platform.eventLedger);
+        const trackedOrders = mapTrackedPendingOrders(platform.eventLedger);
+        const symbolIds = [...trackedPositions, ...trackedOrders].map(record => record.symbolId);
+        platform.marketDataService?.ensureSymbols(symbolIds)
+          .then(() => renderEventLedger())
+          .catch(error => {
+            platform.marketDataStatus = `Error: ${error?.message || String(error)}`;
+            renderSubscriptionMonitor();
+          });
       });
       platform.subscriptionMonitor.state = "Active";
       renderSubscriptionMonitor();

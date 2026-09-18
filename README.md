@@ -1,3 +1,3 @@
-# cTrader Mobile Position Manager 4.9 Subscription Monitor
+# cTrader Mobile Position Manager 5.0 Symbol and Quote Mapping
 
-This read-only diagnostic build visibly reports execution-subscription state, raw event count, last event time, and subscription errors. It stores up to 100 raw execution events in sessionStorage so an accidental refresh can restore the ledger. All live management actions remain locked.
+This read-only build retrieves the light symbol list, loads detailed symbol definitions for event-tracked records, subscribes to their live quotes, replaces Symbol IDs with symbol names, and displays the current normalized bid. The list remains partial and every live management action remains locked.

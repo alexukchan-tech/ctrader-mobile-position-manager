@@ -388,3 +388,6 @@ input, select {
 .monitor-grid strong{display:block;overflow-wrap:anywhere;font-size:13px}
 .monitor-grid .monitor-wide{grid-column:1/-1}
 @media(max-width:430px){.monitor-grid{grid-template-columns:1fr}.monitor-grid .monitor-wide{grid-column:auto}}
+
+/* Version 5.0 symbol and quote mapping */
+.monitor-grid strong{font-variant-numeric:tabular-nums}

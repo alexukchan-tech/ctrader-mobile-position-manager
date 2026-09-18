@@ -26,7 +26,7 @@ const provider = initialMode === AppMode.CONNECTING
   : new DemoProvider();
 
 const platform = {
-  version: "6.0-readonly-release",
+  version: "6.1-final-readonly",
   initialMode,
   currentMode: initialMode,
   provider,
@@ -110,7 +110,7 @@ function ensureValidationSummary() {
     <div><span>Symbols</span><strong id="validationSymbols">Waiting</strong></div>
     <div><span>Quotes</span><strong id="validationQuotes">Waiting</strong></div>
     <div><span>Tracked P/L</span><strong id="validationPnl">Waiting</strong></div>
-    <div><span>Release mode</span><strong>Read-only</strong></div>`;
+    <div><span>Release mode</span><strong>Final read-only</strong></div>`;
   banner.after(section);
 }
 

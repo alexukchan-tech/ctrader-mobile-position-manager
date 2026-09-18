@@ -1,3 +1,3 @@
-# cTrader Mobile Position Manager 4.3 Account Capture
+# cTrader Mobile Position Manager 4.3.1 Copy Fix
 
-This read-only build preserves the sanitized `getAccountInformation` response in a dedicated panel and keeps connection stages in a separate panel. Use **Copy Account Response** after the status becomes **Connected: Read-Only**. All live trading actions remain locked.
+Fixes the disabled Copy Account Response button after a successful read-only connection. If clipboard access is blocked by the cTrader WebView, the button downloads `ctrader-account-response.json` instead. All live trading actions remain locked.

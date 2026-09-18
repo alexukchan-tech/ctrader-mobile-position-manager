@@ -18,7 +18,7 @@ const provider = initialMode === AppMode.CONNECTING
   : new DemoProvider();
 
 const platform = {
-  version: "4.3-account-capture",
+  version: "4.3.1-copy-fix",
   initialMode,
   currentMode: initialMode,
   provider,
@@ -71,9 +71,26 @@ function addInspector() {
   document.querySelector(".app-shell").prepend(section);
   stageOutput = document.getElementById("sdkStageOutput");
   document.getElementById("retrySdkConnection").onclick = connectReadOnly;
-  document.getElementById("copySdkResponse").onclick = () => {
+  document.getElementById("copySdkResponse").onclick = async () => {
+    const button = document.getElementById("copySdkResponse");
     const accountText = document.getElementById("sdkOutput").textContent;
-    return navigator.clipboard.writeText(accountText);
+    try {
+      await navigator.clipboard.writeText(accountText);
+      button.textContent = "Copied";
+      setTimeout(() => { button.textContent = "Copy Account Response"; }, 1500);
+    } catch (error) {
+      const blob = new Blob([accountText], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "ctrader-account-response.json";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      button.textContent = "Downloaded";
+      setTimeout(() => { button.textContent = "Copy Account Response"; }, 1500);
+    }
   };
 }
 
@@ -105,6 +122,8 @@ async function connectReadOnly() {
     document.getElementById("sdkOutput").textContent = JSON.stringify(sanitize(snapshot), null, 2);
     stageOutput.textContent = "Connected. Account information received.";
     copy.disabled = false;
+    copy.removeAttribute("disabled");
+    copy.setAttribute("aria-disabled", "false");
     provider.subscribeToExecutionEvents(event => {
       platform.lastExecutionEvent = event;
       logger.info("Execution event received", sanitize(event));

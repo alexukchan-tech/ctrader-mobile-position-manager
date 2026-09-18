@@ -881,12 +881,37 @@ document.addEventListener("DOMContentLoaded", initializeDemo);
     function applyVolumeDisplay(root = document) {
         const mode = getVolumeDisplay();
 
-        root.querySelectorAll(".details-grid > div").forEach(item => {
-            const label = item.querySelector("span")?.textContent.trim();
-            if (label === "Volume") {
-                item.hidden = mode === "lots";
-            } else if (label === "Lots") {
-                item.hidden = mode === "units";
+        root.querySelectorAll(".details-grid").forEach(grid => {
+            const items = [...grid.children];
+            const volumeItem = items.find(item => item.querySelector("span")?.textContent.trim() === "Volume");
+            const lotsItem = items.find(item => item.querySelector("span")?.textContent.trim() === "Lots");
+
+            // Cards and pending-order screens already contain separate Volume and Lots rows.
+            if (volumeItem && lotsItem) {
+                volumeItem.hidden = mode === "lots";
+                lotsItem.hidden = mode === "units";
+                return;
+            }
+
+            // The Manage Position modal originally contains only one Volume row.
+            // Convert that row instead of hiding it, so a volume section is always visible.
+            if (volumeItem && grid.closest("#positionModal")) {
+                const position = state.positions.find(item => item.id === state.selectedPositionId);
+                const label = volumeItem.querySelector("span");
+                const value = volumeItem.querySelector("strong");
+                if (!position || !label || !value) return;
+
+                volumeItem.hidden = false;
+                if (mode === "lots") {
+                    label.textContent = "Volume (Lots)";
+                    value.textContent = formatNumber(position.volumeLots, 2);
+                } else if (mode === "both") {
+                    label.textContent = "Volume";
+                    value.textContent = `${formatNumber(position.volumeUnits, 0)} units / ${formatNumber(position.volumeLots, 2)} lots`;
+                } else {
+                    label.textContent = "Volume";
+                    value.textContent = `${formatNumber(position.volumeUnits, 0)} units`;
+                }
             }
         });
     }

@@ -1,11 +1,6 @@
-# Version 13.0 Final Production Read-Only
+# Version 13.0.1 Adaptive Quote Final
 
-## Final additions
-- Restored records are marked unconfirmed and cannot produce P/L until reconfirmed by a current-session execution event.
-- Reconnection disposes the old quote subscription, clears quote integrity state, and replaces the execution subscription.
-- Overall health includes verified quote-sequence health for current-session positions.
-- Automated regression tests cover XAUUSD, EURUSD, USDJPY and BTCUSD scaling, Buy/Sell P/L, commission, lifecycle updates, pending-order filtering, session restoration and sensitive-field redaction.
-- Legacy demo archives, sample account data and build scripts are removed.
-
-## Permanent boundary
-This is a partial monitoring view. Close, partial close, breakeven, protection changes, order cancellation, order creation and batch operations are unavailable.
+- Supports both `4379.02` and `437902000` as valid representations of approximately 4379.02.
+- Selects the candidate closest to the position entry price or previous verified quote.
+- Retains two-tick continuity, timestamp, freshness, spread, and plausibility validation.
+- Replaces the misleading `implausible price` message with `no plausible quote representation`.

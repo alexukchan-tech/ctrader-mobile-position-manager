@@ -1,5 +1,5 @@
-# cTrader Mobile Position Manager 13.0 Final Production Read-Only
+# cTrader Mobile Position Manager 13.0.1 Adaptive Quote Final
 
-Final production read-only monitoring release. Version 13 combines quote integrity, auditable P/L, current-session confirmation, restored-record safety, reconnect cleanup, lifecycle filtering, privacy redaction, diagnostics, local backups, and automated regression tests.
+Final quote-normalization hotfix. cTrader quote events may provide either an already-normalized decimal price or an integer encoded with five fixed decimal places. Version 13.0.1 evaluates both representations and selects the candidate closest to the tracked entry price or previous verified quote.
 
-The portfolio remains partial because the Plugin SDK does not provide a verified complete initial position and pending-order snapshot. All trading operations remain unavailable.
+All Version 13 safeguards remain active. P/L is still suppressed for restored, unconfirmed positions, stale quotes, invalid spreads, discontinuous quotes, or quotes that fail two-tick verification. Trading operations remain unavailable.

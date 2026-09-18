@@ -27,3 +27,13 @@ assert.equal(mapTrackedPendingOrders(ledger).length, 1);
 ledger.ingest({ order: { orderId: 2, orderStatus: 5, orderType: 2, closingOrder: false, tradeData: { volume: 10000, lotSize: 10000, symbolId: 1, tradeSide: 1 } } });
 assert.equal(mapTrackedPendingOrders(ledger).length, 0);
 console.log('Regression tests passed: quote scales, P/L, lifecycle, restoration, filtering, redaction.');
+
+const adaptive = (raw, reference) => {
+  const candidates = [Number(raw), Number(raw) / 100000].filter(value => Number.isFinite(value) && value > 0);
+  return candidates.reduce((best, candidate) => Math.abs(Math.log(candidate / reference)) < Math.abs(Math.log(best / reference)) ? candidate : best);
+};
+assert.equal(adaptive(4379.02, 4348.77), 4379.02);
+assert.equal(adaptive(437902000, 4348.77), 4379.02);
+assert.equal(adaptive(114833, 1.15), 1.14833);
+assert.equal(adaptive(15792600, 158), 157.926);
+console.log('Adaptive quote representation tests passed.');

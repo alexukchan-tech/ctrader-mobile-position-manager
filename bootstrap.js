@@ -26,7 +26,7 @@ const provider = initialMode === AppMode.CONNECTING
   : new DemoProvider();
 
 const platform = {
-  version: "13.0-final-production-readonly",
+  version: "13.0.1-adaptive-quote-final",
   initialMode,
   currentMode: initialMode,
   provider,
@@ -118,7 +118,7 @@ function ensureValidationSummary() {
     <div><span>Symbols</span><strong id="validationSymbols">Waiting</strong></div>
     <div><span>Quotes</span><strong id="validationQuotes">Waiting</strong></div>
     <div><span>Tracked P/L</span><strong id="validationPnl">Waiting</strong></div>
-    <div><span>Release mode</span><strong>Final production read-only</strong></div>
+    <div><span>Release mode</span><strong>Final adaptive-quote hotfix</strong></div>
     <div><span>Data scope</span><strong id="validationScope">Partial</strong></div>
     <div><span>Quote health</span><strong id="validationQuoteHealth">Waiting</strong></div>
     <div><span>P/L rule</span><strong>Verified, current-session only</strong></div>
@@ -427,9 +427,9 @@ function addInspector() {
     const service = platform.marketDataService;
     const quote = service?.getQuote(record.symbolId);
     if (!service || !quote) return { bid: null, ask: null, updatedAt: null, stale: true };
-    let bid = service.normalizeQuotePrice(record.symbolId, quote.bid);
-    let ask = service.normalizeQuotePrice(record.symbolId, quote.ask);
     const entry = Number(record.entryPrice);
+    let bid = service.normalizeQuotePrice(record.symbolId, quote.bid, entry);
+    let ask = service.normalizeQuotePrice(record.symbolId, quote.ask, entry);
     const plausible = !Number.isFinite(entry) || entry <= 0 || (
       Number.isFinite(bid) && Number.isFinite(ask) &&
       bid > entry * 0.1 && bid < entry * 10 &&
@@ -460,7 +460,7 @@ function addInspector() {
       ageMs,
       stale: !fresh,
       valid,
-      reason: !plausible ? "implausible price" : !spreadValid ? "invalid spread" : !timestampValid ? "missing timestamp" : !fresh ? "stale quote" : !sequenceVerified ? "awaiting second verified tick" : null,
+      reason: !plausible ? "no plausible quote representation" : !spreadValid ? "invalid spread" : !timestampValid ? "missing timestamp" : !fresh ? "stale quote" : !sequenceVerified ? "awaiting second verified tick" : null,
       integrity
     };
   };

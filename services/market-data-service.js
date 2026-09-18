@@ -184,13 +184,38 @@ export class MarketDataService {
     this.subscribedIds.clear();
   }
 
-  normalizeQuotePrice(symbolId, rawPrice) {
-    if (rawPrice === null || rawPrice === undefined) return null;
+  quoteCandidates(rawPrice) {
     const numeric = Number(rawPrice);
-    if (!Number.isFinite(numeric)) return null;
+    if (!Number.isFinite(numeric) || numeric <= 0) return [];
+    return [...new Set([
+      numeric,
+      numeric / 100000
+    ].filter(value => Number.isFinite(value) && value > 0))];
+  }
 
-    // cTrader quote-event bid/ask values use five fixed decimal places,
-    // independently of the symbol display digits. Example: 437576000 -> 4375.76000.
-    return numeric / 100000;
+  normalizeQuotePrice(symbolId, rawPrice, referencePrice = null) {
+    const candidates = this.quoteCandidates(rawPrice);
+    if (!candidates.length) return null;
+
+    const previous = this.quoteIntegrity.get(String(symbolId));
+    const previousPrice = Number(previous?.normalizedBid || previous?.normalizedAsk);
+    const reference = Number(referencePrice);
+    const target = Number.isFinite(reference) && reference > 0
+      ? reference
+      : Number.isFinite(previousPrice) && previousPrice > 0
+        ? previousPrice
+        : null;
+
+    if (target !== null) {
+      return candidates.reduce((best, candidate) => {
+        const score = Math.abs(Math.log(candidate / target));
+        const bestScore = Math.abs(Math.log(best / target));
+        return score < bestScore ? candidate : best;
+      });
+    }
+
+    // Without a position or previous verified quote, distinguish the two
+    // observed SDK representations: already-normalized prices and fixed-5 integers.
+    return Number(rawPrice) >= 100000 ? Number(rawPrice) / 100000 : Number(rawPrice);
   }
 }

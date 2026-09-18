@@ -1,3 +1,3 @@
-# cTrader Mobile Position Manager 4.2 Read-Only Diagnostic
+# cTrader Mobile Position Manager 4.3 Account Capture
 
-This build uses the official SDK logger, reports each handshake stage, applies a 15-second registration timeout, removes synthetic records immediately in Live mode, and keeps every live trading action locked.
+This read-only build preserves the sanitized `getAccountInformation` response in a dedicated panel and keeps connection stages in a separate panel. Use **Copy Account Response** after the status becomes **Connected: Read-Only**. All live trading actions remain locked.

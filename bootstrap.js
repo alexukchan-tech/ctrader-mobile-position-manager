@@ -18,7 +18,7 @@ const provider = initialMode === AppMode.CONNECTING
   : new DemoProvider();
 
 const platform = {
-  version: "4.2-read-only-diagnostic",
+  version: "4.3-account-capture",
   initialMode,
   currentMode: initialMode,
   provider,
@@ -62,13 +62,19 @@ function addInspector() {
     <p class="calculation-note">Connection diagnostics and sanitized account response. Trading actions are locked.</p>
     <div class="action-row">
       <button id="retrySdkConnection" type="button">Retry Connection</button>
-      <button id="copySdkResponse" type="button" disabled>Copy Response</button>
+      <button id="copySdkResponse" type="button" disabled>Copy Account Response</button>
     </div>
-    <pre id="sdkOutput" class="sdk-output">Preparing connection...</pre>`;
+    <p class="field-label">Connection stage</p>
+    <pre id="sdkStageOutput" class="sdk-output sdk-stage-output">Preparing connection...</pre>
+    <p class="field-label sdk-response-label">Sanitized account response</p>
+    <pre id="sdkOutput" class="sdk-output">Waiting for account information...</pre>`;
   document.querySelector(".app-shell").prepend(section);
-  stageOutput = document.getElementById("sdkOutput");
+  stageOutput = document.getElementById("sdkStageOutput");
   document.getElementById("retrySdkConnection").onclick = connectReadOnly;
-  document.getElementById("copySdkResponse").onclick = () => navigator.clipboard.writeText(stageOutput.textContent);
+  document.getElementById("copySdkResponse").onclick = () => {
+    const accountText = document.getElementById("sdkOutput").textContent;
+    return navigator.clipboard.writeText(accountText);
+  };
 }
 
 function sanitize(value) {
@@ -96,7 +102,8 @@ async function connectReadOnly() {
     platform.currentMode = AppMode.LIVE;
     platform.connectionError = null;
     setStatus("Connected: Read-Only", "connected");
-    stageOutput.textContent = JSON.stringify(sanitize(snapshot), null, 2);
+    document.getElementById("sdkOutput").textContent = JSON.stringify(sanitize(snapshot), null, 2);
+    stageOutput.textContent = "Connected. Account information received.";
     copy.disabled = false;
     provider.subscribeToExecutionEvents(event => {
       platform.lastExecutionEvent = event;
@@ -107,6 +114,7 @@ async function connectReadOnly() {
     platform.connectionError = String(error?.message || error);
     setStatus("Connection Failed", "disconnected");
     stageOutput.textContent = `Connection failed\n\n${platform.connectionError}\n\nReload the published cTrader placement, then retry once.`;
+    document.getElementById("sdkOutput").textContent = "No account response received.";
   } finally {
     retry.disabled = false;
   }

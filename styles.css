@@ -350,3 +350,7 @@ input, select {
 
 /* Version 4.1 read-only SDK inspector */
 .sdk-output{max-height:320px;margin:12px 0 0;padding:12px;overflow:auto;border:1px solid var(--border);border-radius:10px;background:#080b10;color:#c9d1d9;font-size:11px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere}
+
+/* Version 4.3 account capture */
+.sdk-stage-output{max-height:110px}
+.sdk-response-label{margin-top:14px}

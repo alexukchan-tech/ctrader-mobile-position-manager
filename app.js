@@ -388,14 +388,6 @@ function initializeDemo() {
     elements.closeSymbolButton.disabled = false;
     elements.closeAllButton.disabled = false;
 
-    elements.closeSymbolButton.addEventListener("click", () => {
-        showDemoNotice("Close-all-for-symbol preview. Symbol selection will be added with the cTrader account connection.");
-    });
-
-    elements.closeAllButton.addEventListener("click", () => {
-        showDemoNotice(`Close-all preview for ${state.positions.length} demo positions across all symbols.`);
-    });
-
     elements.positionsTab.addEventListener("click", () => setActiveTab("positions"));
     elements.ordersTab.addEventListener("click", () => setActiveTab("orders"));
 
@@ -406,3 +398,213 @@ function initializeDemo() {
 }
 
 document.addEventListener("DOMContentLoaded", initializeDemo);
+
+// Demo v2 enhancement layer. No requests are sent to cTrader.
+(function enableDemoV2() {
+    const originalPositions = JSON.parse(JSON.stringify(demoPositions));
+    let symbolFilter = "ALL";
+    let directionFilter = "ALL";
+    let sortMode = "NEWEST";
+
+    const sectionHeading = elements.positionsView.querySelector(".section-heading");
+    const toolbar = document.createElement("div");
+    toolbar.className = "toolbar-grid";
+    toolbar.innerHTML = `
+        <select id="symbolFilter" aria-label="Filter positions by symbol"></select>
+        <select id="directionFilter" aria-label="Filter positions by direction">
+            <option value="ALL">All directions</option>
+            <option value="Buy">Buy only</option>
+            <option value="Sell">Sell only</option>
+        </select>
+        <select id="positionSort" aria-label="Sort positions">
+            <option value="NEWEST">Newest first</option>
+            <option value="PROFIT">Highest profit</option>
+            <option value="LOSS">Largest loss</option>
+            <option value="SYMBOL">Symbol</option>
+            <option value="VOLUME">Largest volume</option>
+        </select>
+        <button id="resetDemoButton" class="secondary-button" type="button">Reset Demo Data</button>`;
+    sectionHeading.insertAdjacentElement("afterend", toolbar);
+
+    function rebuildSymbolFilter() {
+        const symbols = [...new Set(state.positions.map(p => p.symbol))].sort();
+        const select = document.getElementById("symbolFilter");
+        select.innerHTML = '<option value="ALL">All symbols</option>' +
+            symbols.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("");
+        if (symbols.includes(symbolFilter)) select.value = symbolFilter;
+        else symbolFilter = "ALL";
+    }
+
+    function filteredPositions() {
+        let rows = state.positions.filter(p =>
+            (symbolFilter === "ALL" || p.symbol === symbolFilter) &&
+            (directionFilter === "ALL" || p.direction === directionFilter));
+        rows = [...rows];
+        if (sortMode === "PROFIT") rows.sort((a,b) => b.netProfit - a.netProfit);
+        else if (sortMode === "LOSS") rows.sort((a,b) => a.netProfit - b.netProfit);
+        else if (sortMode === "SYMBOL") rows.sort((a,b) => a.symbol.localeCompare(b.symbol));
+        else if (sortMode === "VOLUME") rows.sort((a,b) => b.volumeUnits - a.volumeUnits);
+        else rows.sort((a,b) => b.openedAt.localeCompare(a.openedAt));
+        return rows;
+    }
+
+    const baseRenderPositions = renderPositions;
+    renderPositions = function renderFilteredPositions() {
+        const all = state.positions;
+        const visible = filteredPositions();
+        state.positions = visible;
+        baseRenderPositions();
+        elements.positionsStatus.textContent = `${visible.length} of ${all.length} demo positions`;
+        state.positions = all;
+    };
+
+    function refreshAll(message) {
+        rebuildSymbolFilter();
+        renderSummary();
+        renderPositions();
+        renderPendingOrders();
+        if (message) {
+            const old = document.querySelector(".result-banner");
+            old?.remove();
+            const banner = document.createElement("div");
+            banner.className = "result-banner";
+            banner.textContent = message;
+            elements.positionsView.insertBefore(banner, toolbar);
+        }
+    }
+
+    function showConfirm({title, body, confirmText, typedPhrase, onConfirm}) {
+        document.getElementById("actionConfirmModal")?.remove();
+        const modal = document.createElement("div");
+        modal.id = "actionConfirmModal";
+        modal.className = "modal-backdrop";
+        modal.innerHTML = `
+          <section class="modal-panel" role="dialog" aria-modal="true">
+            <div class="modal-header"><h2>${escapeHtml(title)}</h2>
+              <button class="icon-button" id="cancelActionTop" type="button">×</button></div>
+            <div class="confirm-summary">${body}</div>
+            ${typedPhrase ? `<p class="confirm-warning">Type <strong>${escapeHtml(typedPhrase)}</strong> to enable confirmation.</p>
+              <input id="typedConfirmation" class="typed-confirm" autocomplete="off">` : ""}
+            <div class="action-row" style="margin-top:14px">
+              <button id="cancelAction" type="button">Cancel</button>
+              <button id="confirmAction" class="danger-button" type="button" ${typedPhrase ? "disabled" : ""}>${escapeHtml(confirmText)}</button>
+            </div>
+          </section>`;
+        document.body.appendChild(modal);
+        const close = () => modal.remove();
+        document.getElementById("cancelActionTop").onclick = close;
+        document.getElementById("cancelAction").onclick = close;
+        modal.addEventListener("click", e => { if (e.target === modal) close(); });
+        if (typedPhrase) {
+            const input = document.getElementById("typedConfirmation");
+            input.addEventListener("input", () => {
+                document.getElementById("confirmAction").disabled = input.value.trim().toUpperCase() !== typedPhrase;
+            });
+        }
+        document.getElementById("confirmAction").onclick = () => { close(); onConfirm(); };
+    }
+
+    function impactBody(rows) {
+        const buys = rows.filter(p => p.direction === "Buy").length;
+        const sells = rows.length - buys;
+        const volume = rows.reduce((n,p) => n + p.volumeUnits, 0);
+        const pnl = rows.reduce((n,p) => n + p.netProfit, 0);
+        const symbols = [...new Set(rows.map(p => p.symbol))].join(", ");
+        return `<strong>Positions:</strong> ${rows.length}<br>
+          <strong>Buy / Sell:</strong> ${buys} / ${sells}<br>
+          <strong>Total volume:</strong> ${formatNumber(volume,0)} units<br>
+          <strong>Floating P/L:</strong> ${formatMoney(pnl)}<br>
+          <strong>Symbols:</strong> ${escapeHtml(symbols || "None")}<br><br>
+          <span class="confirm-warning">Demo mode only. This changes synthetic browser data.</span>`;
+    }
+
+    document.getElementById("symbolFilter").onchange = e => { symbolFilter = e.target.value; renderPositions(); };
+    document.getElementById("directionFilter").onchange = e => { directionFilter = e.target.value; renderPositions(); };
+    document.getElementById("positionSort").onchange = e => { sortMode = e.target.value; renderPositions(); };
+    document.getElementById("resetDemoButton").onclick = () => {
+        state.positions = JSON.parse(JSON.stringify(originalPositions));
+        symbolFilter = "ALL";
+        directionFilter = "ALL";
+        sortMode = "NEWEST";
+        document.getElementById("directionFilter").value = "ALL";
+        document.getElementById("positionSort").value = "NEWEST";
+        refreshAll("Demo positions restored.");
+    };
+
+    // Replace simple Close All demo notices with full review and confirmation.
+    elements.closeSymbolButton.replaceWith(elements.closeSymbolButton.cloneNode(true));
+    elements.closeAllButton.replaceWith(elements.closeAllButton.cloneNode(true));
+    elements.closeSymbolButton = document.getElementById("closeSymbolButton");
+    elements.closeAllButton = document.getElementById("closeAllButton");
+    elements.closeSymbolButton.disabled = false;
+    elements.closeAllButton.disabled = false;
+
+    elements.closeSymbolButton.onclick = () => {
+        const symbols = [...new Set(state.positions.map(p => p.symbol))].sort();
+        if (!symbols.length) return;
+        const selected = symbolFilter !== "ALL" ? symbolFilter : symbols[0];
+        const rows = state.positions.filter(p => p.symbol === selected);
+        showConfirm({
+            title: `Close All ${selected} Positions`, body: impactBody(rows),
+            confirmText: `Confirm Close ${selected}`,
+            onConfirm: () => {
+                state.positions = state.positions.filter(p => p.symbol !== selected);
+                refreshAll(`Demo complete: ${rows.length} ${selected} position(s) removed.`);
+            }
+        });
+    };
+
+    elements.closeAllButton.onclick = () => {
+        const rows = [...state.positions];
+        if (!rows.length) return;
+        showConfirm({
+            title: "Close All Positions", body: impactBody(rows),
+            confirmText: "Confirm Close All", typedPhrase: "CLOSE ALL",
+            onConfirm: () => {
+                state.positions = [];
+                refreshAll(`Demo complete: ${rows.length} position(s) removed.`);
+            }
+        });
+    };
+
+    // Capture management actions and turn final browser demo actions into real state changes.
+    document.addEventListener("click", event => {
+        const closeButton = event.target.closest("#closeSelectedButton");
+        if (closeButton && state.selectedPositionId) {
+            event.stopImmediatePropagation();
+            const p = state.positions.find(x => x.id === state.selectedPositionId);
+            if (!p) return;
+            showConfirm({
+                title: "Close Selected Position",
+                body: impactBody([p]), confirmText: "Confirm Close Position",
+                onConfirm: () => {
+                    closeModal();
+                    state.positions = state.positions.filter(x => x.id !== p.id);
+                    refreshAll(`Demo complete: ${p.symbol} #${p.id} removed.`);
+                }
+            });
+        }
+        const partialButton = event.target.closest("#partialCloseButton");
+        if (partialButton && state.selectedPositionId) {
+            event.stopImmediatePropagation();
+            const p = state.positions.find(x => x.id === state.selectedPositionId);
+            const percent = Math.min(99, Math.max(1, Number(document.getElementById("partialClosePercent")?.value) || 0));
+            const closeUnits = Math.floor((p.volumeUnits * percent / 100) / 1000) * 1000;
+            const remaining = p.volumeUnits - closeUnits;
+            showConfirm({
+                title: "Confirm Partial Close",
+                body: `<strong>Position:</strong> ${p.symbol} #${p.id}<br><strong>Current:</strong> ${formatNumber(p.volumeUnits,0)} units<br><strong>Close:</strong> ${formatNumber(closeUnits,0)} units (${percent}%)<br><strong>Remaining:</strong> ${formatNumber(remaining,0)} units<br><br><span class="confirm-warning">Temporary demo step: 1,000 units.</span>`,
+                confirmText: "Confirm Partial Close",
+                onConfirm: () => {
+                    if (closeUnits <= 0 || remaining <= 0) return;
+                    p.volumeUnits = remaining;
+                    p.volumeLots = Math.max(0, p.volumeLots * remaining / (remaining + closeUnits));
+                    closeModal();
+                    refreshAll(`Demo partial close complete for ${p.symbol} #${p.id}.`);
+                }
+            });
+        }
+    }, true);
+
+    refreshAll();
+})();

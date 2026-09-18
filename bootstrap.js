@@ -12,6 +12,7 @@ import * as formatService from "./services/format-service.js";
 const logger = createDebugLogger();
 const initialMode = detectInitialMode();
 let stageOutput = null;
+let renderEventLedger = () => {};
 const provider = initialMode === AppMode.CONNECTING
   ? new CTraderProvider({
       logger,
@@ -22,7 +23,7 @@ const provider = initialMode === AppMode.CONNECTING
   : new DemoProvider();
 
 const platform = {
-  version: "4.8-event-tracked-live-lists",
+  version: "4.8.1-ledger-render-fix",
   initialMode,
   currentMode: initialMode,
   provider,
@@ -153,7 +154,7 @@ function addInspector() {
         <button type="button" disabled>Order Action Locked</button>
       </article>`).join("") : '<div class="empty-state">No event-tracked pending entry orders.</div>';
   };
-  const renderLedger = () => {
+  renderEventLedger = () => {
     const report = platform.eventLedger.export();
     const openPositions = mapTrackedPositions(platform.eventLedger);
     const pendingOrders = mapTrackedPendingOrders(platform.eventLedger);
@@ -182,9 +183,9 @@ function addInspector() {
   };
   document.getElementById("clearEventLedger").onclick = () => {
     platform.eventLedger.clear();
-    renderLedger();
+    renderEventLedger();
   };
-  renderLedger();
+  renderEventLedger();
 
   const interfaceOutput = document.getElementById("sdkInterfaceOutput");
   const renderInterfaceReport = () => {
@@ -309,7 +310,7 @@ async function connectReadOnly() {
       platform.lastExecutionEvent = sanitize(event);
       const result = platform.eventLedger.ingest(event);
       logger.info("Execution event received", result);
-      renderLedger();
+      renderEventLedger();
     });
   } catch (error) {
     platform.currentMode = AppMode.CONNECTION_ERROR;

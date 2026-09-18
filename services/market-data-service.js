@@ -148,8 +148,11 @@ export class MarketDataService {
 
   normalizeQuotePrice(symbolId, rawPrice) {
     if (rawPrice === null || rawPrice === undefined) return null;
-    const info = this.getSymbolInfo(symbolId) || {};
-    const digits = Number(readField(info, ["digits"]) ?? 5);
-    return Number(rawPrice) / Math.pow(10, digits);
+    const numeric = Number(rawPrice);
+    if (!Number.isFinite(numeric)) return null;
+
+    // cTrader quote-event bid/ask values use five fixed decimal places,
+    // independently of the symbol display digits. Example: 437576000 -> 4375.76000.
+    return numeric / 100000;
   }
 }

@@ -1,5 +1,5 @@
-# cTrader Mobile Position Manager 10.0 Final Production Monitoring
+# cTrader Mobile Position Manager 10.0.1 Quote Scale Hotfix
 
-Version 10.0 is the final production monitoring package. It provides read-only cTrader host connectivity, account metadata, execution-event monitoring, session restoration, partial event-tracked positions and pending-entry orders, symbol mapping, live bid/ask, quote health, estimated tracked P/L, lifecycle filtering, resilient reconnection, ledger backup and sanitized monitoring snapshots.
+Corrects the cTrader quote-event price conversion. Bid and ask values are encoded with five fixed decimal places, independently of each symbol's display digits. For example, raw `437576000` is normalized to `4375.76`, not `4375760.00`.
 
-The portfolio is partial because records existing before plugin connection may be missing. Trading operations are unavailable.
+The hotfix also rejects implausible quotes relative to the tracked entry price, preventing an invalid quote from producing an extreme estimated P/L. Trading operations remain unavailable.

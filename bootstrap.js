@@ -26,7 +26,7 @@ const provider = initialMode === AppMode.CONNECTING
   : new DemoProvider();
 
 const platform = {
-  version: "10.0-final-production-monitoring",
+  version: "10.0.1-quote-scale-hotfix",
   initialMode,
   currentMode: initialMode,
   provider,
@@ -118,7 +118,7 @@ function ensureValidationSummary() {
     <div><span>Symbols</span><strong id="validationSymbols">Waiting</strong></div>
     <div><span>Quotes</span><strong id="validationQuotes">Waiting</strong></div>
     <div><span>Tracked P/L</span><strong id="validationPnl">Waiting</strong></div>
-    <div><span>Release mode</span><strong>Final production monitoring</strong></div>
+    <div><span>Release mode</span><strong>Production hotfix</strong></div>
     <div><span>Data scope</span><strong id="validationScope">Partial</strong></div>
     <div><span>Quote health</span><strong id="validationQuoteHealth">Waiting</strong></div>
     <div><span>Session health</span><strong id="validationSession">Starting</strong></div>
@@ -421,8 +421,18 @@ function addInspector() {
     const service = platform.marketDataService;
     const quote = service?.getQuote(record.symbolId);
     if (!service || !quote) return { bid: null, ask: null, updatedAt: null, stale: true };
-    const bid = service.normalizeQuotePrice(record.symbolId, quote.bid);
-    const ask = service.normalizeQuotePrice(record.symbolId, quote.ask);
+    let bid = service.normalizeQuotePrice(record.symbolId, quote.bid);
+    let ask = service.normalizeQuotePrice(record.symbolId, quote.ask);
+    const entry = Number(record.entryPrice);
+    const plausible = !Number.isFinite(entry) || entry <= 0 || (
+      Number.isFinite(bid) && Number.isFinite(ask) &&
+      bid > entry * 0.1 && bid < entry * 10 &&
+      ask > entry * 0.1 && ask < entry * 10
+    );
+    if (!plausible) {
+      bid = null;
+      ask = null;
+    }
     const timestamp = Number(quote.timestamp || quote.utcTimestamp || Date.now());
     const updatedAt = Number.isFinite(timestamp) ? new Date(timestamp).toLocaleTimeString() : "Unknown";
     return { bid, ask, updatedAt, stale: Number.isFinite(timestamp) ? Date.now() - timestamp > 15000 : false };

@@ -1,12 +1,8 @@
-# Version 10.0 Deployment
+# Version 10.0.1 Deployment
 
-1. Upload all extracted files and folders to the GitHub repository root.
-2. Replace the previous release files.
-3. Delete old demo ZIPs, sample JSON exports, build scripts and legacy files not included in this package.
-4. Keep every file included in this package, including the two small compatibility service files.
-5. Commit with `Release Version 10.0 final production monitoring`.
-6. Wait for GitHub Pages deployment success.
-7. Retain `mode=live` and `showLogs=true`, and change the cache parameter to `v=100`.
-8. Publish the cTrader plugin configuration.
-9. Close old Position Manager instances and reopen one placement.
-10. Verify build `10.0-final-production-monitoring` and release mode `Final production monitoring`.
+1. Upload every extracted file to the repository root and replace the existing Version 10.0 files.
+2. Commit with `Fix cTrader quote scaling and P/L guardrails`.
+3. Wait for GitHub Pages deployment success.
+4. Keep `mode=live` and `showLogs=true`; change the cache parameter to `v=1001`.
+5. Publish the cTrader placement, close old instances, and reopen one instance.
+6. Verify build `10.0.1-quote-scale-hotfix`.

@@ -1,0 +1,219 @@
+:root {
+    color-scheme: dark;
+    font-family:
+        Inter,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        sans-serif;
+
+    --background: #0d1117;
+    --surface: #161b22;
+    --surface-raised: #1f2630;
+    --border: #30363d;
+    --text: #f0f6fc;
+    --muted: #8b949e;
+    --primary: #2f81f7;
+    --positive: #3fb950;
+    --negative: #f85149;
+    --warning: #d29922;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--background);
+    color: var(--text);
+}
+
+button,
+input,
+select {
+    font: inherit;
+}
+
+button {
+    min-height: 44px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface-raised);
+    color: var(--text);
+    cursor: pointer;
+}
+
+button:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+}
+
+.app-shell {
+    width: 100%;
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 16px;
+}
+
+.app-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.eyebrow {
+    margin: 0 0 4px;
+    color: var(--primary);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+h1,
+h2,
+p {
+    margin-top: 0;
+}
+
+h1 {
+    margin-bottom: 0;
+    font-size: 24px;
+}
+
+h2 {
+    margin-bottom: 12px;
+    font-size: 17px;
+}
+
+.status {
+    padding: 7px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.status.disconnected {
+    background: rgba(210, 153, 34, 0.16);
+    color: #e3b341;
+}
+
+.status.connected {
+    background: rgba(63, 185, 80, 0.16);
+    color: var(--positive);
+}
+
+.summary-card,
+.content-section,
+.danger-zone {
+    margin-bottom: 16px;
+    padding: 16px;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: var(--surface);
+}
+
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+}
+
+.summary-grid div {
+    min-width: 0;
+    padding: 12px;
+    border-radius: 12px;
+    background: var(--surface-raised);
+}
+
+.summary-grid span {
+    display: block;
+    margin-bottom: 7px;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.summary-grid strong {
+    display: block;
+    overflow: hidden;
+    font-size: 17px;
+    text-overflow: ellipsis;
+}
+
+.tab-bar {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.tab-button.active {
+    border-color: var(--primary);
+    background: var(--primary);
+    color: white;
+}
+
+.section-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.section-heading span {
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.record-list {
+    display: grid;
+    gap: 12px;
+}
+
+.empty-state {
+    padding: 24px 12px;
+    color: var(--muted);
+    text-align: center;
+}
+
+.danger-zone {
+    border-color: rgba(248, 81, 73, 0.55);
+}
+
+.danger-zone h2 {
+    color: var(--negative);
+}
+
+.danger-zone p {
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.danger-zone button {
+    width: 100%;
+    margin-top: 8px;
+    border-color: rgba(248, 81, 73, 0.5);
+}
+
+.hidden {
+    display: none;
+}
+
+@media (max-width: 430px) {
+    .app-shell {
+        padding: 12px;
+    }
+
+    .summary-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .summary-grid div:last-child {
+        grid-column: 1 / -1;
+    }
+}

@@ -1,5 +1,5 @@
-# cTrader Mobile Position Manager 6.1 Final Read-Only
+# cTrader Mobile Position Manager 7.0 Monitoring Release
 
-Final consolidated read-only release. It monitors positions and pending entry orders observed through execution events, maps symbols, subscribes to quotes, estimates tracked P/L, restores the session ledger, and provides a non-executing close simulation.
+Version 7.0 is a monitoring-only release. It consolidates the working cTrader Plugin SDK connection, execution-event ledger, session restoration, partial event-tracked position and pending-order views, symbol mapping, live quotes, quote health, estimated tracked P/L, lifecycle filtering, compact diagnostics and monitoring snapshot export.
 
-The displayed portfolio is partial. All trading actions are intentionally disabled.
+The portfolio view is partial because records that existed before the plugin connected may be missing. Trading operations are unavailable.

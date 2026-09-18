@@ -1,19 +1,18 @@
-# Version 6.1 Final Read-Only Release
+# Version 7.0 Monitoring Release
 
-## Included
-- cTrader Plugin SDK host handshake
-- Read-only account metadata
-- Execution-event subscription monitor
-- Session event ledger restoration
-- Partial event-tracked open-position list
-- Partial event-tracked pending-entry-order list
-- Symbol-name and symbol-digit mapping
-- Live bid and ask display
-- Quote freshness monitoring
-- Estimated P/L for event-tracked positions
-- Position and order lifecycle filtering
-- Compact diagnostics and validation summary
-- Non-executing close-position simulation
+## New in Version 7.0
+- Monitoring-only release mode
+- Partial-scope counter
+- Quote-health summary
+- Downloadable sanitized monitoring snapshot
+- Clearer non-trading position exit reference
 
-## Safety boundary
-The Plugin SDK does not expose a verified complete initial portfolio snapshot in this implementation. Records existing before connection may be absent. Consequently, all trading operations remain disabled, including close, partial close, breakeven, protection modification, order cancellation and batch actions.
+## Included monitoring capabilities
+- SDK host connection and account metadata
+- Execution-event subscription and session ledger
+- Event-tracked open positions and pending entry orders
+- Symbol names, bid/ask, quote freshness and estimated tracked P/L
+- Lifecycle filtering and compact diagnostics
+
+## Boundary
+No live close, partial close, breakeven, protection modification, order cancellation, order creation or batch action is available.

@@ -26,7 +26,7 @@ const provider = initialMode === AppMode.CONNECTING
   : new DemoProvider();
 
 const platform = {
-  version: "6.1-final-readonly",
+  version: "7.0-monitoring-release",
   initialMode,
   currentMode: initialMode,
   provider,
@@ -66,10 +66,10 @@ function ensureClosePreview() {
   overlay.hidden = true;
   overlay.innerHTML = `
     <section class="modal-card close-preview-card" role="dialog" aria-modal="true" aria-labelledby="closePreviewTitle">
-      <div class="modal-header"><h2 id="closePreviewTitle">Close Position Simulation</h2><button id="closePreviewDismiss" type="button" aria-label="Close preview">×</button></div>
+      <div class="modal-header"><h2 id="closePreviewTitle">Position Exit Reference</h2><button id="closePreviewDismiss" type="button" aria-label="Close preview">×</button></div>
       <div id="closePreviewContent"></div>
       <div class="preview-warning"><strong>Simulation only</strong><span>No request will be sent to cTrader. Live position closing remains locked.</span></div>
-      <div class="action-row"><button id="closePreviewCancel" type="button">Back</button><button type="button" disabled>Trading Disabled</button></div>
+      <div class="action-row"><button id="closePreviewCancel" type="button">Back</button><button type="button" disabled>Trading Unavailable</button></div>
     </section>`;
   document.body.appendChild(overlay);
   const hide = () => { overlay.hidden = true; };
@@ -110,7 +110,9 @@ function ensureValidationSummary() {
     <div><span>Symbols</span><strong id="validationSymbols">Waiting</strong></div>
     <div><span>Quotes</span><strong id="validationQuotes">Waiting</strong></div>
     <div><span>Tracked P/L</span><strong id="validationPnl">Waiting</strong></div>
-    <div><span>Release mode</span><strong>Final read-only</strong></div>`;
+    <div><span>Release mode</span><strong>Monitoring only</strong></div>
+    <div><span>Data scope</span><strong id="validationScope">Partial</strong></div>
+    <div><span>Quote health</span><strong id="validationQuoteHealth">Waiting</strong></div>`;
   banner.after(section);
 }
 
@@ -128,6 +130,15 @@ function updateValidationSummary() {
   document.getElementById("validationSymbols").textContent = symbolNamesReady ? "Mapped" : "Pending";
   document.getElementById("validationQuotes").textContent = quotesReady ? "Live" : positions.length ? "Pending" : "No tracked positions";
   document.getElementById("validationPnl").textContent = quotesReady ? "Estimated" : "Waiting for quotes";
+  const staleCount = positions.filter(position => {
+    const quote = platform.marketDataService?.getQuote(position.symbolId);
+    const timestamp = Number(quote?.timestamp || quote?.utcTimestamp || 0);
+    return !timestamp || Date.now() - timestamp > 15000;
+  }).length;
+  document.getElementById("validationScope").textContent = `Partial, ${positions.length} tracked`;
+  document.getElementById("validationQuoteHealth").textContent = positions.length === 0
+    ? "No tracked positions"
+    : staleCount === 0 ? "Healthy" : `${staleCount} stale/missing`;
 }
 
 function ensurePartialViewBanner() {
@@ -185,6 +196,7 @@ function addInspector() {
       <div class="monitor-wide"><span>Subscription error</span><strong id="subscriptionError">None</strong></div>
     </div>
     <button id="resetSessionLedger" type="button" class="secondary-button">Reset Session Ledger</button>
+    <button id="downloadMonitoringSnapshot" type="button" class="secondary-button">Download Monitoring Snapshot</button>
     <p class="field-label sdk-response-label">Execution Event Ledger</p>
     <div class="ledger-warning">Initial account snapshot unavailable. The ledger includes only positions and orders observed in execution events after this plugin instance connected.</div>
     <div class="ledger-summary">
@@ -244,6 +256,42 @@ function addInspector() {
   };
   document.getElementById("visibleBuildVersion").textContent = platform.version;
   renderSubscriptionMonitor();
+  document.getElementById("downloadMonitoringSnapshot").onclick = () => {
+    const positions = mapTrackedPositions(platform.eventLedger).map(position => ({
+      positionId: position.id,
+      symbol: platform.marketDataService?.getSymbolName(position.symbolId),
+      side: position.side,
+      volumeUnits: position.volumeUnits,
+      volumeLots: position.volumeLots,
+      entryPrice: position.entryPrice,
+      stopLoss: position.stopLoss,
+      takeProfit: position.takeProfit,
+      quote: platform.marketDataService?.getQuote(position.symbolId) || null,
+      source: position.source
+    }));
+    const snapshot = {
+      version: platform.version,
+      generatedAt: new Date().toISOString(),
+      releaseMode: "monitoring-only",
+      dataScope: "partial-event-tracked",
+      warning: "Records existing before plugin connection may be missing.",
+      connectionMode: platform.currentMode,
+      subscription: platform.subscriptionMonitor,
+      marketDataStatus: platform.marketDataStatus,
+      positions,
+      pendingOrders: mapTrackedPendingOrders(platform.eventLedger)
+    };
+    const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "ctrader-monitoring-snapshot.json";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
+
   document.getElementById("resetSessionLedger").onclick = () => {
     clearSessionEvents();
     platform.eventLedger.clear();

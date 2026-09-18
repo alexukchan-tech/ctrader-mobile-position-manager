@@ -354,3 +354,6 @@ input, select {
 /* Version 4.3 account capture */
 .sdk-stage-output{max-height:110px}
 .sdk-response-label{margin-top:14px}
+
+/* Version 4.4 snapshot discovery */
+#sdkDiscoveryOutput{max-height:280px}

@@ -1,3 +1,4 @@
+import { SnapshotDiscoveryService, discoverSdkCapabilities, sanitizeDeep } from "./services/snapshot-discovery-service.js";
 import { DemoProvider } from "./services/demo-provider.js";
 import { CTraderProvider } from "./services/ctrader-provider.js";
 import { AppMode, detectInitialMode } from "./services/app-mode-service.js";
@@ -18,7 +19,7 @@ const provider = initialMode === AppMode.CONNECTING
   : new DemoProvider();
 
 const platform = {
-  version: "4.3.1-copy-fix",
+  version: "4.4-snapshot-discovery",
   initialMode,
   currentMode: initialMode,
   provider,
@@ -28,7 +29,9 @@ const platform = {
   liveTradingLocked: true,
   accountSnapshot: null,
   lastExecutionEvent: null,
-  connectionError: null
+  connectionError: null,
+  discoveryService: null,
+  discoveryCaptures: []
 };
 window.positionManagerPlatform = platform;
 
@@ -67,10 +70,41 @@ function addInspector() {
     <p class="field-label">Connection stage</p>
     <pre id="sdkStageOutput" class="sdk-output sdk-stage-output">Preparing connection...</pre>
     <p class="field-label sdk-response-label">Sanitized account response</p>
-    <pre id="sdkOutput" class="sdk-output">Waiting for account information...</pre>`;
+    <pre id="sdkOutput" class="sdk-output">Waiting for account information...</pre>
+    <p class="field-label sdk-response-label">SDK snapshot discovery</p>
+    <div class="action-row">
+      <button id="copyDiscoveryReport" type="button">Copy Discovery Report</button>
+      <button id="clearDiscoveryReport" type="button">Clear Captures</button>
+    </div>
+    <pre id="sdkDiscoveryOutput" class="sdk-output">Discovering SDK capabilities...</pre>`;
   document.querySelector(".app-shell").prepend(section);
   stageOutput = document.getElementById("sdkStageOutput");
   document.getElementById("retrySdkConnection").onclick = connectReadOnly;
+  const discoveryOutput = document.getElementById("sdkDiscoveryOutput");
+  const capabilities = discoverSdkCapabilities();
+  discoveryOutput.textContent = JSON.stringify(capabilities, null, 2);
+  document.getElementById("copyDiscoveryReport").onclick = async () => {
+    const report = JSON.stringify({ capabilities, captures: platform.discoveryCaptures }, null, 2);
+    try {
+      await navigator.clipboard.writeText(report);
+      document.getElementById("copyDiscoveryReport").textContent = "Copied";
+    } catch {
+      const blob = new Blob([report], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "ctrader-sdk-discovery.json";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    }
+  };
+  document.getElementById("clearDiscoveryReport").onclick = () => {
+    platform.discoveryCaptures = [];
+    discoveryOutput.textContent = JSON.stringify(capabilities, null, 2);
+  };
+
   document.getElementById("copySdkResponse").onclick = async () => {
     const button = document.getElementById("copySdkResponse");
     const accountText = document.getElementById("sdkOutput").textContent;
@@ -95,7 +129,7 @@ function addInspector() {
 }
 
 function sanitize(value) {
-  const blocked = /token|secret|password|credential/i;
+  const blocked = /token|secret|password|credential|^(name|email|login|traderid|groupid|clientmsgid|uuid)$/i;
   if (Array.isArray(value)) return value.map(sanitize);
   if (value && typeof value === "object") {
     return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, blocked.test(key) ? "[REDACTED]" : sanitize(item)]));
@@ -125,9 +159,22 @@ async function connectReadOnly() {
     copy.removeAttribute("disabled");
     copy.setAttribute("aria-disabled", "false");
     provider.subscribeToExecutionEvents(event => {
-      platform.lastExecutionEvent = event;
-      logger.info("Execution event received", sanitize(event));
+      platform.lastExecutionEvent = sanitizeDeep(event);
+      logger.info("Execution event received", platform.lastExecutionEvent);
     });
+    platform.discoveryService?.stop?.();
+    platform.discoveryService = new SnapshotDiscoveryService({
+      adapter: provider.adapter,
+      logger,
+      onCapture: capture => {
+        platform.discoveryCaptures.push(capture);
+        const report = { capabilities: discoverSdkCapabilities(), captures: platform.discoveryCaptures };
+        document.getElementById("sdkDiscoveryOutput").textContent = JSON.stringify(report, null, 2);
+      }
+    });
+    const activeStreams = platform.discoveryService.startPassiveCapture();
+    const report = { capabilities: discoverSdkCapabilities(), activePassiveStreams: activeStreams, captures: [] };
+    document.getElementById("sdkDiscoveryOutput").textContent = JSON.stringify(report, null, 2);
   } catch (error) {
     platform.currentMode = AppMode.CONNECTION_ERROR;
     platform.connectionError = String(error?.message || error);

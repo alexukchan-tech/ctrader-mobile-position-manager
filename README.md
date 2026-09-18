@@ -1,3 +1,3 @@
-# cTrader Mobile Position Manager 4.3.1 Copy Fix
+# cTrader Mobile Position Manager 4.4 Snapshot Discovery
 
-Fixes the disabled Copy Account Response button after a successful read-only connection. If clipboard access is blocked by the cTrader WebView, the button downloads `ctrader-account-response.json` instead. All live trading actions remain locked.
+This strictly read-only build enumerates relevant SDK exports and passively subscribes to any documented/exposed server-data, reconcile, position, or order event streams available in the loaded SDK. It redacts personal identifiers and secrets from account and discovery exports. No trading request is enabled.

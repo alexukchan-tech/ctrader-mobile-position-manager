@@ -26,7 +26,7 @@ const provider = initialMode === AppMode.CONNECTING
   : new DemoProvider();
 
 const platform = {
-  version: "7.0-monitoring-release",
+  version: "8.0-resilient-monitoring",
   initialMode,
   currentMode: initialMode,
   provider,
@@ -42,6 +42,12 @@ const platform = {
   eventLedger: new EventLedger({ maximumEvents: 100 }),
   marketDataService: null,
   marketDataStatus: "Not started",
+  health: {
+    startedAt: new Date().toISOString(),
+    lastRenderAt: null,
+    lastQuoteAt: null,
+    reconnectAttempts: 0
+  },
   subscriptionMonitor: {
     state: "Not started",
     rawEventCount: 0,
@@ -110,9 +116,11 @@ function ensureValidationSummary() {
     <div><span>Symbols</span><strong id="validationSymbols">Waiting</strong></div>
     <div><span>Quotes</span><strong id="validationQuotes">Waiting</strong></div>
     <div><span>Tracked P/L</span><strong id="validationPnl">Waiting</strong></div>
-    <div><span>Release mode</span><strong>Monitoring only</strong></div>
+    <div><span>Release mode</span><strong>Resilient monitoring</strong></div>
     <div><span>Data scope</span><strong id="validationScope">Partial</strong></div>
-    <div><span>Quote health</span><strong id="validationQuoteHealth">Waiting</strong></div>`;
+    <div><span>Quote health</span><strong id="validationQuoteHealth">Waiting</strong></div>
+    <div><span>Session health</span><strong id="validationSession">Starting</strong></div>
+    <div><span>Last refresh</span><strong id="validationRefresh">Never</strong></div>`;
   banner.after(section);
 }
 
@@ -139,6 +147,11 @@ function updateValidationSummary() {
   document.getElementById("validationQuoteHealth").textContent = positions.length === 0
     ? "No tracked positions"
     : staleCount === 0 ? "Healthy" : `${staleCount} stale/missing`;
+  const sessionAgeMinutes = Math.max(0, Math.floor((Date.now() - Date.parse(platform.health.startedAt)) / 60000));
+  document.getElementById("validationSession").textContent = `${sessionAgeMinutes} min | ${platform.health.reconnectAttempts} reconnect(s)`;
+  document.getElementById("validationRefresh").textContent = platform.health.lastRenderAt
+    ? new Date(platform.health.lastRenderAt).toLocaleTimeString()
+    : "Never";
 }
 
 function ensurePartialViewBanner() {
@@ -197,6 +210,8 @@ function addInspector() {
     </div>
     <button id="resetSessionLedger" type="button" class="secondary-button">Reset Session Ledger</button>
     <button id="downloadMonitoringSnapshot" type="button" class="secondary-button">Download Monitoring Snapshot</button>
+    <button id="backupSessionLedger" type="button" class="secondary-button">Backup Session Ledger</button>
+    <button id="reconnectMonitoring" type="button" class="secondary-button">Reconnect Monitoring</button>
     <p class="field-label sdk-response-label">Execution Event Ledger</p>
     <div class="ledger-warning">Initial account snapshot unavailable. The ledger includes only positions and orders observed in execution events after this plugin instance connected.</div>
     <div class="ledger-summary">
@@ -256,6 +271,38 @@ function addInspector() {
   };
   document.getElementById("visibleBuildVersion").textContent = platform.version;
   renderSubscriptionMonitor();
+  document.getElementById("backupSessionLedger").onclick = () => {
+    const backup = {
+      version: platform.version,
+      generatedAt: new Date().toISOString(),
+      warning: "Partial event-tracked session backup. Not a complete account statement.",
+      ledger: platform.eventLedger.export()
+    };
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "ctrader-session-ledger-backup.json";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  document.getElementById("reconnectMonitoring").onclick = async () => {
+    const button = document.getElementById("reconnectMonitoring");
+    button.disabled = true;
+    button.textContent = "Reconnecting...";
+    platform.health.reconnectAttempts += 1;
+    try {
+      await connectReadOnly();
+    } finally {
+      button.disabled = false;
+      button.textContent = "Reconnect Monitoring";
+      updateValidationSummary();
+    }
+  };
+
   document.getElementById("downloadMonitoringSnapshot").onclick = () => {
     const positions = mapTrackedPositions(platform.eventLedger).map(position => ({
       positionId: position.id,
@@ -278,6 +325,7 @@ function addInspector() {
       connectionMode: platform.currentMode,
       subscription: platform.subscriptionMonitor,
       marketDataStatus: platform.marketDataStatus,
+      health: platform.health,
       positions,
       pendingOrders: mapTrackedPendingOrders(platform.eventLedger)
     };
@@ -468,6 +516,7 @@ function addInspector() {
     ledgerOutput.textContent = report.events.length ? JSON.stringify(report, null, 2) : "Waiting for execution events...";
     renderTrackedLists();
     renderPrimaryReadOnlyLists();
+    platform.health.lastRenderAt = new Date().toISOString();
     updateValidationSummary();
   };
   document.getElementById("copyEventLedger").onclick = async () => {
@@ -626,7 +675,10 @@ async function connectReadOnly() {
         platform.marketDataStatus = status;
         renderSubscriptionMonitor();
       },
-      onQuote: () => renderEventLedger()
+      onQuote: () => {
+        platform.health.lastQuoteAt = new Date().toISOString();
+        renderEventLedger();
+      }
     });
     try {
       await platform.marketDataService.initialize();

@@ -1,5 +1,5 @@
-# cTrader Mobile Position Manager 7.0 Monitoring Release
+# cTrader Mobile Position Manager 8.0 Resilient Monitoring
 
-Version 7.0 is a monitoring-only release. It consolidates the working cTrader Plugin SDK connection, execution-event ledger, session restoration, partial event-tracked position and pending-order views, symbol mapping, live quotes, quote health, estimated tracked P/L, lifecycle filtering, compact diagnostics and monitoring snapshot export.
+Version 8.0 is a resilient monitoring-only release. It adds session-health indicators, render timestamps, controlled monitoring reconnection, session-ledger backup and richer health data in monitoring snapshots while retaining the partial event-tracked portfolio, symbol mapping, quotes, quote-health checks and estimated tracked P/L.
 
-The portfolio view is partial because records that existed before the plugin connected may be missing. Trading operations are unavailable.
+The Plugin SDK view remains partial. Trading operations are unavailable.

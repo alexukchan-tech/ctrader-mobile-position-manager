@@ -1,18 +1,19 @@
-# Version 7.0 Monitoring Release
+# Version 8.0 Resilient Monitoring
 
-## New in Version 7.0
-- Monitoring-only release mode
-- Partial-scope counter
-- Quote-health summary
-- Downloadable sanitized monitoring snapshot
-- Clearer non-trading position exit reference
+## New
+- Session age and reconnect counters
+- Last UI refresh timestamp
+- Controlled monitoring reconnect button
+- Downloadable session-ledger backup
+- Runtime health data in monitoring snapshots
+- Clearer resilient-monitoring release mode
 
-## Included monitoring capabilities
-- SDK host connection and account metadata
-- Execution-event subscription and session ledger
-- Event-tracked open positions and pending entry orders
-- Symbol names, bid/ask, quote freshness and estimated tracked P/L
-- Lifecycle filtering and compact diagnostics
+## Retained
+- cTrader host connection and account metadata
+- Execution-event ledger with session restoration
+- Partial event-tracked positions and pending entry orders
+- Symbol names, bid/ask, quote health and estimated tracked P/L
+- Lifecycle filtering, diagnostics and non-executing exit reference
 
 ## Boundary
-No live close, partial close, breakeven, protection modification, order cancellation, order creation or batch action is available.
+No trading request is imported or invoked. Close, partial close, breakeven, protection changes, order changes and batch operations remain unavailable.

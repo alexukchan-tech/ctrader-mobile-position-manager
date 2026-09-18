@@ -424,3 +424,7 @@ input, select {
 
 /* Version 7.0 monitoring release */
 .validation-summary{grid-template-columns:repeat(auto-fit,minmax(120px,1fr))}
+
+/* Version 8.0 resilient monitoring */
+.validation-summary{grid-template-columns:repeat(auto-fit,minmax(118px,1fr))}
+#reconnectMonitoring:not(:disabled){border-color:rgba(47,129,247,.55)}

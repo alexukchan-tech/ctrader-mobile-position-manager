@@ -1,4 +1,4 @@
-import { SnapshotDiscoveryService, discoverSdkCapabilities, sanitizeDeep } from "./services/snapshot-discovery-service.js";
+import { probePresets, runServerDataProbe } from "./services/server-data-probe-service.js";
 import { DemoProvider } from "./services/demo-provider.js";
 import { CTraderProvider } from "./services/ctrader-provider.js";
 import { AppMode, detectInitialMode } from "./services/app-mode-service.js";
@@ -19,7 +19,7 @@ const provider = initialMode === AppMode.CONNECTING
   : new DemoProvider();
 
 const platform = {
-  version: "4.4-snapshot-discovery",
+  version: "4.5-server-data-probe",
   initialMode,
   currentMode: initialMode,
   provider,
@@ -71,38 +71,57 @@ function addInspector() {
     <pre id="sdkStageOutput" class="sdk-output sdk-stage-output">Preparing connection...</pre>
     <p class="field-label sdk-response-label">Sanitized account response</p>
     <pre id="sdkOutput" class="sdk-output">Waiting for account information...</pre>
-    <p class="field-label sdk-response-label">SDK snapshot discovery</p>
+    <p class="field-label sdk-response-label">Read-only getServerData probe</p>
+    <select id="serverDataPreset"></select>
+    <textarea id="serverDataPayload" class="sdk-probe-input" rows="3" spellcheck="false">{}</textarea>
     <div class="action-row">
-      <button id="copyDiscoveryReport" type="button">Copy Discovery Report</button>
-      <button id="clearDiscoveryReport" type="button">Clear Captures</button>
+      <button id="runServerDataProbe" type="button">Run Selected Probe</button>
+      <button id="copyDiscoveryReport" type="button">Copy Probe Report</button>
+      <button id="clearDiscoveryReport" type="button">Clear Report</button>
     </div>
-    <pre id="sdkDiscoveryOutput" class="sdk-output">Discovering SDK capabilities...</pre>`;
+    <p class="calculation-note">These calls request data only. No order, close, cancel, or protection method is invoked.</p>
+    <pre id="sdkDiscoveryOutput" class="sdk-output">Waiting for a probe...</pre>`;
   document.querySelector(".app-shell").prepend(section);
   stageOutput = document.getElementById("sdkStageOutput");
   document.getElementById("retrySdkConnection").onclick = connectReadOnly;
   const discoveryOutput = document.getElementById("sdkDiscoveryOutput");
-  const capabilities = discoverSdkCapabilities();
-  discoveryOutput.textContent = JSON.stringify(capabilities, null, 2);
+  const presetSelect = document.getElementById("serverDataPreset");
+  const payloadInput = document.getElementById("serverDataPayload");
+  probePresets.forEach((preset, index) => {
+    const option = document.createElement("option");
+    option.value = String(index);
+    option.textContent = preset.label;
+    presetSelect.appendChild(option);
+  });
+  presetSelect.onchange = () => { payloadInput.value = probePresets[Number(presetSelect.value)].data; };
+  document.getElementById("runServerDataProbe").onclick = async () => {
+    const button = document.getElementById("runServerDataProbe");
+    if (!provider?.adapter || !provider?.connected) {
+      discoveryOutput.textContent = "Connect to cTrader first.";
+      return;
+    }
+    button.disabled = true;
+    discoveryOutput.textContent = "Requesting server data...";
+    const result = await runServerDataProbe(provider.adapter, payloadInput.value.trim());
+    platform.discoveryCaptures.push(result);
+    platform.discoveryCaptures = platform.discoveryCaptures.slice(-20);
+    discoveryOutput.textContent = JSON.stringify(platform.discoveryCaptures, null, 2);
+    button.disabled = false;
+  };
   document.getElementById("copyDiscoveryReport").onclick = async () => {
-    const report = JSON.stringify({ capabilities, captures: platform.discoveryCaptures }, null, 2);
-    try {
-      await navigator.clipboard.writeText(report);
-      document.getElementById("copyDiscoveryReport").textContent = "Copied";
-    } catch {
+    const report = JSON.stringify({ version: platform.version, results: platform.discoveryCaptures }, null, 2);
+    try { await navigator.clipboard.writeText(report); }
+    catch {
       const blob = new Blob([report], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
-      link.href = url;
-      link.download = "ctrader-sdk-discovery.json";
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
+      link.href = url; link.download = "ctrader-server-data-probe.json";
+      document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
     }
   };
   document.getElementById("clearDiscoveryReport").onclick = () => {
     platform.discoveryCaptures = [];
-    discoveryOutput.textContent = JSON.stringify(capabilities, null, 2);
+    discoveryOutput.textContent = "Waiting for a probe...";
   };
 
   document.getElementById("copySdkResponse").onclick = async () => {
@@ -159,17 +178,9 @@ async function connectReadOnly() {
     copy.removeAttribute("disabled");
     copy.setAttribute("aria-disabled", "false");
     provider.subscribeToExecutionEvents(event => {
-      platform.lastExecutionEvent = sanitizeDeep(event);
+      platform.lastExecutionEvent = sanitize(event);
       logger.info("Execution event received", platform.lastExecutionEvent);
     });
-    platform.discoveryService?.stop?.();
-    platform.discoveryService = new SnapshotDiscoveryService({
-      adapter: provider.adapter,
-      logger,
-      onCapture: capture => {
-        platform.discoveryCaptures.push(capture);
-        const report = { capabilities: discoverSdkCapabilities(), captures: platform.discoveryCaptures };
-        document.getElementById("sdkDiscoveryOutput").textContent = JSON.stringify(report, null, 2);
       }
     });
     const activeStreams = platform.discoveryService.startPassiveCapture();

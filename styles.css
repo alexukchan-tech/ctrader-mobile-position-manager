@@ -357,3 +357,7 @@ input, select {
 
 /* Version 4.4 snapshot discovery */
 #sdkDiscoveryOutput{max-height:280px}
+
+/* Version 4.5 focused server-data probe */
+.sdk-probe-input{width:100%;box-sizing:border-box;margin:8px 0 10px;padding:10px;border:1px solid var(--border);border-radius:8px;background:#080b10;color:#c9d1d9;font:12px/1.4 monospace;resize:vertical}
+#serverDataPreset{width:100%;margin-top:6px}

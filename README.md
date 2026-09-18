@@ -1,3 +1,3 @@
-# cTrader Mobile Position Manager 4.4 Snapshot Discovery
+# cTrader Mobile Position Manager 4.5 Server Data Probe
 
-This strictly read-only build enumerates relevant SDK exports and passively subscribes to any documented/exposed server-data, reconcile, position, or order event streams available in the loaded SDK. It redacts personal identifiers and secrets from account and discovery exports. No trading request is enabled.
+A strictly read-only diagnostic build for testing `getServerData(adapter, { data })` payloads. It includes conservative presets, records at most 20 results, filters out passive quote noise, and keeps all trading actions locked.

@@ -19,7 +19,7 @@ const provider = initialMode === AppMode.CONNECTING
   : new DemoProvider();
 
 const platform = {
-  version: "4.5-server-data-probe",
+  version: "4.5.1-bootstrap-fix",
   initialMode,
   currentMode: initialMode,
   provider,
@@ -181,11 +181,6 @@ async function connectReadOnly() {
       platform.lastExecutionEvent = sanitize(event);
       logger.info("Execution event received", platform.lastExecutionEvent);
     });
-      }
-    });
-    const activeStreams = platform.discoveryService.startPassiveCapture();
-    const report = { capabilities: discoverSdkCapabilities(), activePassiveStreams: activeStreams, captures: [] };
-    document.getElementById("sdkDiscoveryOutput").textContent = JSON.stringify(report, null, 2);
   } catch (error) {
     platform.currentMode = AppMode.CONNECTION_ERROR;
     platform.connectionError = String(error?.message || error);

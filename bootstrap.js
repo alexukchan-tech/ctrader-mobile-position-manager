@@ -26,7 +26,7 @@ const provider = initialMode === AppMode.CONNECTING
   : new DemoProvider();
 
 const platform = {
-  version: "5.2-readonly-console",
+  version: "5.2.1-symbol-name-fix",
   initialMode,
   currentMode: initialMode,
   provider,
@@ -280,7 +280,8 @@ function addInspector() {
       const estimate = estimatePositionPnl(position);
       const symbolName = platform.marketDataService?.getSymbolName(position.symbolId) || `Symbol ID ${position.symbolId}`;
       const symbolInfo = platform.marketDataService?.getSymbolInfo(position.symbolId) || {};
-      const symbolDigits = Number(symbolInfo.digits ?? 5);
+      const symbolDigitsKey = Object.keys(symbolInfo).find(key => key.toLowerCase() === "digits");
+      const symbolDigits = Number(symbolDigitsKey ? symbolInfo[symbolDigitsKey] : 5);
       const formatPrice = value => Number.isFinite(Number(value)) ? Number(value).toFixed(symbolDigits) : "Waiting for quote";
       const quoteText = estimate.quote.bid == null
         ? "Waiting for quote"

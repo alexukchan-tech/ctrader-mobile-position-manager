@@ -1,3 +1,3 @@
-# cTrader Mobile Position Manager 5.2 Read-Only Console
+# cTrader Mobile Position Manager 5.2.1 Symbol Name Fix
 
-This consolidated read-only milestone places event-tracked records in the primary Positions and Pending Orders tabs, adds a persistent Partial Account View warning, collapses detailed SDK diagnostics by default, formats live bid/ask using symbol digits, reports quote freshness, retains session-ledger lifecycle filtering, and keeps every live management action locked.
+Fixes symbol mapping for SDK payloads that use PascalCase fields such as `SymbolId`, `SymbolName`, `Name`, and `Digits`. The previous implementation only read camelCase properties, causing tracked cards to remain labelled `Symbol ID 41`. All live management actions remain locked.

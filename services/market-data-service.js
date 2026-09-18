@@ -33,11 +33,21 @@ function once(observable, timeoutMs = 15000) {
   });
 }
 
+function readField(object, candidates) {
+  if (!object || typeof object !== "object") return undefined;
+  const keys = Object.keys(object);
+  for (const candidate of candidates) {
+    const key = keys.find(item => item.toLowerCase() === candidate.toLowerCase());
+    if (key) return object[key];
+  }
+  return undefined;
+}
+
 function findArray(root, preferredKeys) {
   if (!root || typeof root !== "object") return [];
   for (const key of preferredKeys) {
-    const actual = Object.keys(root).find(item => item.toLowerCase() === key.toLowerCase());
-    if (actual && Array.isArray(root[actual])) return root[actual];
+    const value = readField(root, [key]);
+    if (Array.isArray(value)) return value;
   }
   for (const value of Object.values(root)) {
     const found = findArray(value, preferredKeys);
@@ -49,8 +59,8 @@ function findArray(root, preferredKeys) {
 function findObject(root, preferredKeys) {
   if (!root || typeof root !== "object") return null;
   for (const key of preferredKeys) {
-    const actual = Object.keys(root).find(item => item.toLowerCase() === key.toLowerCase());
-    if (actual && root[actual] && typeof root[actual] === "object") return root[actual];
+    const value = readField(root, [key]);
+    if (value && typeof value === "object") return value;
   }
   for (const value of Object.values(root)) {
     const found = findObject(value, preferredKeys);
@@ -72,14 +82,18 @@ export class MarketDataService {
     this.quoteSubscription = null;
   }
 
+  storeSymbol(targetMap, symbol) {
+    const id = readField(symbol, ["symbolId", "id"]);
+    if (id === undefined || id === null) return false;
+    targetMap.set(String(id), symbol);
+    return true;
+  }
+
   async initialize() {
     this.onStatus("Loading symbol list");
     const response = await once(getLightSymbolList(this.adapter, {}));
     const symbols = findArray(response, ["symbol", "symbols"]);
-    for (const symbol of symbols) {
-      const id = symbol.symbolId ?? symbol.id;
-      if (id !== undefined) this.lightSymbols.set(String(id), symbol);
-    }
+    symbols.forEach(symbol => this.storeSymbol(this.lightSymbols, symbol));
     this.onStatus(`Symbol list loaded: ${this.lightSymbols.size}`);
     this.quoteSubscription?.unsubscribe?.();
     this.quoteSubscription = quoteEvent(this.adapter).subscribe({
@@ -95,10 +109,7 @@ export class MarketDataService {
       this.onStatus(`Loading ${missing.length} symbol definition(s)`);
       const response = await once(getSymbol(this.adapter, { symbolId: missing.map(Number) }));
       const details = findArray(response, ["symbol", "symbols"]);
-      for (const symbol of details) {
-        const id = symbol.symbolId ?? symbol.id;
-        if (id !== undefined) this.symbolDetails.set(String(id), symbol);
-      }
+      details.forEach(symbol => this.storeSymbol(this.symbolDetails, symbol));
     }
 
     const newSubscriptions = unique.filter(id => !this.subscribedIds.has(id));
@@ -111,8 +122,8 @@ export class MarketDataService {
 
   handleQuote(event) {
     const payload = findObject(event, ["payload", "quote"]) || event;
-    const symbolId = payload.symbolId ?? payload.id;
-    if (symbolId === undefined) return;
+    const symbolId = readField(payload, ["symbolId", "id"]);
+    if (symbolId === undefined || symbolId === null) return;
     this.quotes.set(String(symbolId), payload);
     this.onQuote(String(symbolId), payload);
   }
@@ -121,7 +132,9 @@ export class MarketDataService {
     const id = String(symbolId);
     const light = this.lightSymbols.get(id);
     const detail = this.symbolDetails.get(id);
-    return detail?.symbolName || detail?.name || light?.symbolName || light?.name || `Symbol ID ${id}`;
+    return readField(detail, ["symbolName", "name"]) ||
+      readField(light, ["symbolName", "name"]) ||
+      `Symbol ID ${id}`;
   }
 
   getSymbolInfo(symbolId) {
@@ -136,7 +149,7 @@ export class MarketDataService {
   normalizeQuotePrice(symbolId, rawPrice) {
     if (rawPrice === null || rawPrice === undefined) return null;
     const info = this.getSymbolInfo(symbolId) || {};
-    const digits = Number(info.digits ?? 5);
+    const digits = Number(readField(info, ["digits"]) ?? 5);
     return Number(rawPrice) / Math.pow(10, digits);
   }
 }

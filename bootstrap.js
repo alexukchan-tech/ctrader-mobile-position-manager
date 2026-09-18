@@ -4,25 +4,10 @@ import { AppMode, detectInitialMode } from "./services/app-mode-service.js";
 import { createDebugLogger } from "./services/debug-logger.js";
 import * as settingsService from "./services/settings-service.js";
 import * as formatService from "./services/format-service.js";
-
-const logger = createDebugLogger();
-const initialMode = detectInitialMode();
-const provider = initialMode === AppMode.CONNECTING
-  ? new CTraderProvider({ logger })
-  : new DemoProvider();
-
-window.positionManagerPlatform = Object.freeze({
-  version: "4.0-preparation",
-  initialMode,
-  provider,
-  logger,
-  settingsService,
-  formatService,
-  liveTradingLocked: true
-});
-
-logger.info("Application platform initialized", {
-  version: window.positionManagerPlatform.version,
-  initialMode,
-  liveTradingLocked: true
-});
+const logger=createDebugLogger(); const initialMode=detectInitialMode(); const provider=initialMode===AppMode.CONNECTING?new CTraderProvider({logger}):new DemoProvider();
+const platform={version:"4.1-read-only-probe",initialMode,currentMode:initialMode,provider,logger,settingsService,formatService,liveTradingLocked:true,accountSnapshot:null,lastExecutionEvent:null,connectionError:null}; window.positionManagerPlatform=platform;
+function setStatus(text,cls){const e=document.getElementById("connectionStatus");if(e){e.textContent=text;e.className=`status ${cls}`;}}
+function inspector(){if(document.getElementById("sdkInspector"))return;const s=document.createElement("section");s.id="sdkInspector";s.className="content-section";s.innerHTML=`<div class="section-heading"><h2>cTrader SDK Inspector</h2><span>Read-only</span></div><p class="calculation-note">Sanitized account response for mapping. No trading request is enabled.</p><div class="action-row"><button id="retrySdkConnection" type="button">Retry Connection</button><button id="copySdkResponse" type="button" disabled>Copy Response</button></div><pre id="sdkOutput" class="sdk-output">Waiting for cTrader host...</pre>`;document.querySelector(".app-shell").prepend(s);document.getElementById("retrySdkConnection").onclick=connectReadOnly;document.getElementById("copySdkResponse").onclick=()=>navigator.clipboard.writeText(document.getElementById("sdkOutput").textContent);}
+function sanitize(v){const blocked=/token|secret|password|credential/i;if(Array.isArray(v))return v.map(sanitize);if(v&&typeof v==="object")return Object.fromEntries(Object.entries(v).map(([k,x])=>[k,blocked.test(k)?"[REDACTED]":sanitize(x)]));return v;}
+async function connectReadOnly(){if(initialMode!==AppMode.CONNECTING)return;inspector();setStatus("Connecting...","disconnected");const out=document.getElementById("sdkOutput"),retry=document.getElementById("retrySdkConnection"),copy=document.getElementById("copySdkResponse");retry.disabled=true;copy.disabled=true;out.textContent="Completing confirm -> register -> confirm handshake...";try{await provider.connect();const snap=await provider.getAccountSnapshot();platform.accountSnapshot=snap;platform.currentMode=AppMode.LIVE;platform.connectionError=null;setStatus("Connected: Read-Only","connected");out.textContent=JSON.stringify(sanitize(snap),null,2);copy.disabled=false;provider.subscribeToExecutionEvents(event=>{platform.lastExecutionEvent=event;logger.info("Execution event received",sanitize(event));});}catch(error){platform.currentMode=AppMode.CONNECTION_ERROR;platform.connectionError=String(error?.message||error);setStatus("Connection Failed","disconnected");out.textContent=`Connection failed:\n${platform.connectionError}\n\nConfirm that this URL is running inside a published cTrader web plugin placement.`;}finally{retry.disabled=false;}}
+logger.info("Application platform initialized",{version:platform.version,initialMode,liveTradingLocked:true});if(initialMode===AppMode.CONNECTING)window.addEventListener("DOMContentLoaded",connectReadOnly,{once:true});

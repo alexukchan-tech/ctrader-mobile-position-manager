@@ -26,7 +26,7 @@ const provider = initialMode === AppMode.CONNECTING
   : new DemoProvider();
 
 const platform = {
-  version: "8.0-resilient-monitoring",
+  version: "10.0-final-production-monitoring",
   initialMode,
   currentMode: initialMode,
   provider,
@@ -46,7 +46,9 @@ const platform = {
     startedAt: new Date().toISOString(),
     lastRenderAt: null,
     lastQuoteAt: null,
-    reconnectAttempts: 0
+    reconnectAttempts: 0,
+    storageAvailable: true,
+    lastErrorAt: null
   },
   subscriptionMonitor: {
     state: "Not started",
@@ -116,11 +118,13 @@ function ensureValidationSummary() {
     <div><span>Symbols</span><strong id="validationSymbols">Waiting</strong></div>
     <div><span>Quotes</span><strong id="validationQuotes">Waiting</strong></div>
     <div><span>Tracked P/L</span><strong id="validationPnl">Waiting</strong></div>
-    <div><span>Release mode</span><strong>Resilient monitoring</strong></div>
+    <div><span>Release mode</span><strong>Final production monitoring</strong></div>
     <div><span>Data scope</span><strong id="validationScope">Partial</strong></div>
     <div><span>Quote health</span><strong id="validationQuoteHealth">Waiting</strong></div>
     <div><span>Session health</span><strong id="validationSession">Starting</strong></div>
-    <div><span>Last refresh</span><strong id="validationRefresh">Never</strong></div>`;
+    <div><span>Last refresh</span><strong id="validationRefresh">Never</strong></div>
+    <div><span>Storage</span><strong id="validationStorage">Checking</strong></div>
+    <div><span>Overall health</span><strong id="validationOverall">Starting</strong></div>`;
   banner.after(section);
 }
 
@@ -152,6 +156,13 @@ function updateValidationSummary() {
   document.getElementById("validationRefresh").textContent = platform.health.lastRenderAt
     ? new Date(platform.health.lastRenderAt).toLocaleTimeString()
     : "Never";
+  document.getElementById("validationStorage").textContent = platform.health.storageAvailable ? "Available" : "Unavailable";
+  const healthyConnection = platform.currentMode === AppMode.LIVE;
+  const healthyEvents = platform.subscriptionMonitor.state === "Active";
+  const healthyMarket = !String(platform.marketDataStatus).startsWith("Error");
+  document.getElementById("validationOverall").textContent = healthyConnection && healthyEvents && healthyMarket
+    ? "Healthy"
+    : "Attention required";
 }
 
 function ensurePartialViewBanner() {
@@ -228,7 +239,7 @@ function addInspector() {
     <div id="trackedPendingOrderLabel" hidden>0</div>
     <div id="trackedPositionList" hidden></div>
     <div id="trackedOrderList" hidden></div>
-    <p class="field-label sdk-response-label">SDK ServerInterfaces inspector</p>
+    <div class="production-hidden" hidden><p class="field-label sdk-response-label">SDK ServerInterfaces inspector</p>
     <div class="action-row">
       <button id="refreshInterfaceReport" type="button">Refresh Interface Report</button>
       <button id="copyInterfaceReport" type="button">Copy Interface Report</button>
@@ -243,7 +254,7 @@ function addInspector() {
       <button id="clearDiscoveryReport" type="button">Clear Report</button>
     </div>
     <p class="calculation-note">These calls request data only. No order, close, cancel, or protection method is invoked.</p>
-    <pre id="sdkDiscoveryOutput" class="sdk-output">Waiting for a probe...</pre>
+    <pre id="sdkDiscoveryOutput" class="sdk-output">Production diagnostics disabled.</pre></div>
     </div>`;
   document.querySelector(".app-shell").prepend(section);
   const toggleDiagnostics = document.getElementById("toggleDiagnostics");
@@ -349,6 +360,15 @@ function addInspector() {
     renderSubscriptionMonitor();
     renderEventLedger();
   };
+
+  try {
+    const storageProbeKey = "ctraderPositionManager.storageProbe";
+    sessionStorage.setItem(storageProbeKey, "1");
+    sessionStorage.removeItem(storageProbeKey);
+    platform.health.storageAvailable = true;
+  } catch {
+    platform.health.storageAvailable = false;
+  }
 
   const restoredEvents = loadSessionEvents();
   restoredEvents.forEach(event => platform.eventLedger.ingest(event));
@@ -579,7 +599,10 @@ function addInspector() {
     option.textContent = preset.label;
     presetSelect.appendChild(option);
   });
-  presetSelect.onchange = () => { payloadInput.value = probePresets[Number(presetSelect.value)].data; };
+  presetSelect.onchange = () => {
+    const preset = probePresets[Number(presetSelect.value)];
+    if (preset) payloadInput.value = preset.data;
+  };
   document.getElementById("runServerDataProbe").onclick = async () => {
     const button = document.getElementById("runServerDataProbe");
     if (!provider?.adapter || !provider?.connected) {
@@ -642,8 +665,10 @@ function sanitize(value) {
   return value;
 }
 
+let connectionInProgress = false;
 async function connectReadOnly() {
-  if (initialMode !== AppMode.CONNECTING) return;
+  if (initialMode !== AppMode.CONNECTING || connectionInProgress) return;
+  connectionInProgress = true;
   addInspector();
   ensurePartialViewBanner();
   ensureValidationSummary();
@@ -725,14 +750,18 @@ async function connectReadOnly() {
   } catch (error) {
     platform.currentMode = AppMode.CONNECTION_ERROR;
     platform.connectionError = String(error?.message || error);
+    platform.health.lastErrorAt = new Date().toISOString();
     setStatus("Connection Failed", "disconnected");
     stageOutput.textContent = `Connection failed\n\n${platform.connectionError}\n\nReload the published cTrader placement, then retry once.`;
     document.getElementById("sdkOutput").textContent = "No account response received.";
   } finally {
     retry.disabled = false;
+    connectionInProgress = false;
+    updateValidationSummary();
   }
 }
 
+setInterval(() => updateValidationSummary(), 5000);
 logger.info("Application platform initialized", { version: platform.version, initialMode, liveTradingLocked: true });
 if (initialMode === AppMode.CONNECTING) {
   window.addEventListener("DOMContentLoaded", () => setTimeout(connectReadOnly, 100), { once: true });

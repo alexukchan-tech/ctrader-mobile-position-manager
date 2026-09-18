@@ -364,3 +364,12 @@ input, select {
 
 /* Version 4.6 ServerInterfaces inspector */
 #sdkInterfaceOutput{max-height:360px}
+
+/* Version 4.7 execution event ledger */
+.ledger-warning{margin:8px 0 12px;padding:11px;border:1px solid rgba(210,153,34,.5);border-radius:10px;background:rgba(210,153,34,.1);color:#e3b341;font-size:12px;line-height:1.5}
+.ledger-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
+.ledger-summary div{padding:10px;border-radius:10px;background:var(--surface-raised)}
+.ledger-summary span{display:block;margin-bottom:5px;color:var(--muted);font-size:11px}
+.ledger-summary strong{font-size:17px}
+#eventLedgerOutput{max-height:360px}
+@media(max-width:430px){.ledger-summary{grid-template-columns:1fr}}

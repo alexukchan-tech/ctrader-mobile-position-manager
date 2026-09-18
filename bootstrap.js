@@ -1,3 +1,4 @@
+import { EventLedger } from "./services/event-ledger-service.js";
 import { inspectServerInterfaces } from "./services/server-interface-inspector.js";
 import { probePresets, runServerDataProbe } from "./services/server-data-probe-service.js";
 import { DemoProvider } from "./services/demo-provider.js";
@@ -20,7 +21,7 @@ const provider = initialMode === AppMode.CONNECTING
   : new DemoProvider();
 
 const platform = {
-  version: "4.6-interface-inspector",
+  version: "4.7-event-ledger",
   initialMode,
   currentMode: initialMode,
   provider,
@@ -32,7 +33,8 @@ const platform = {
   lastExecutionEvent: null,
   connectionError: null,
   discoveryService: null,
-  discoveryCaptures: []
+  discoveryCaptures: [],
+  eventLedger: new EventLedger({ maximumEvents: 100 })
 };
 window.positionManagerPlatform = platform;
 
@@ -72,6 +74,18 @@ function addInspector() {
     <pre id="sdkStageOutput" class="sdk-output sdk-stage-output">Preparing connection...</pre>
     <p class="field-label sdk-response-label">Sanitized account response</p>
     <pre id="sdkOutput" class="sdk-output">Waiting for account information...</pre>
+    <p class="field-label sdk-response-label">Execution Event Ledger</p>
+    <div class="ledger-warning">Initial account snapshot unavailable. The ledger includes only positions and orders observed in execution events after this plugin instance connected.</div>
+    <div class="ledger-summary">
+      <div><span>Tracked positions</span><strong id="trackedPositionCount">0</strong></div>
+      <div><span>Tracked orders</span><strong id="trackedOrderCount">0</strong></div>
+      <div><span>Captured events</span><strong id="capturedEventCount">0</strong></div>
+    </div>
+    <div class="action-row">
+      <button id="copyEventLedger" type="button">Copy Event Ledger</button>
+      <button id="clearEventLedger" type="button">Clear Ledger</button>
+    </div>
+    <pre id="eventLedgerOutput" class="sdk-output">Waiting for execution events...</pre>
     <p class="field-label sdk-response-label">SDK ServerInterfaces inspector</p>
     <div class="action-row">
       <button id="refreshInterfaceReport" type="button">Refresh Interface Report</button>
@@ -91,6 +105,39 @@ function addInspector() {
   document.querySelector(".app-shell").prepend(section);
   stageOutput = document.getElementById("sdkStageOutput");
   document.getElementById("retrySdkConnection").onclick = connectReadOnly;
+  const ledgerOutput = document.getElementById("eventLedgerOutput");
+  const renderLedger = () => {
+    const report = platform.eventLedger.export();
+    document.getElementById("trackedPositionCount").textContent = String(report.positionCount);
+    document.getElementById("trackedOrderCount").textContent = String(report.orderCount);
+    document.getElementById("capturedEventCount").textContent = String(report.events.length);
+    ledgerOutput.textContent = report.events.length
+      ? JSON.stringify(report, null, 2)
+      : "Waiting for execution events...";
+  };
+  document.getElementById("copyEventLedger").onclick = async () => {
+    const text = JSON.stringify(platform.eventLedger.export(), null, 2);
+    try {
+      await navigator.clipboard.writeText(text);
+      document.getElementById("copyEventLedger").textContent = "Copied";
+    } catch {
+      const blob = new Blob([text], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "ctrader-event-ledger.json";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    }
+  };
+  document.getElementById("clearEventLedger").onclick = () => {
+    platform.eventLedger.clear();
+    renderLedger();
+  };
+  renderLedger();
+
   const interfaceOutput = document.getElementById("sdkInterfaceOutput");
   const renderInterfaceReport = () => {
     const report = inspectServerInterfaces();
@@ -212,7 +259,13 @@ async function connectReadOnly() {
     copy.setAttribute("aria-disabled", "false");
     provider.subscribeToExecutionEvents(event => {
       platform.lastExecutionEvent = sanitize(event);
-      logger.info("Execution event received", platform.lastExecutionEvent);
+      const result = platform.eventLedger.ingest(event);
+      logger.info("Execution event received", result);
+      const report = platform.eventLedger.export();
+      document.getElementById("trackedPositionCount").textContent = String(report.positionCount);
+      document.getElementById("trackedOrderCount").textContent = String(report.orderCount);
+      document.getElementById("capturedEventCount").textContent = String(report.events.length);
+      document.getElementById("eventLedgerOutput").textContent = JSON.stringify(report, null, 2);
     });
   } catch (error) {
     platform.currentMode = AppMode.CONNECTION_ERROR;

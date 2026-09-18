@@ -1,3 +1,3 @@
-# cTrader Mobile Position Manager 4.7 Event Ledger
+# cTrader Mobile Position Manager 4.8 Event-Tracked Live Lists
 
-This strictly read-only build captures `executionEvent` messages after the plugin connects, sanitizes them, and maintains in-memory ledgers deduplicated by position ID and order ID. The ledger is explicitly incomplete because the Plugin SDK does not expose an initial portfolio snapshot in the inspected interface. All live management actions remain locked.
+This strictly read-only build maps the execution-event ledger into partial live lists. Open positions require `positionStatus = OPEN` and positive volume. Pending entry orders require accepted status, non-closing classification, and order type Limit, Stop, or Stop Limit. Protective SL/TP orders and filled market orders are excluded. The interface permanently warns that records existing before connection may be missing. All management actions remain locked.

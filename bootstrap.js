@@ -1,3 +1,4 @@
+import { mapTrackedPositions, mapTrackedPendingOrders } from "./services/event-list-mapper.js";
 import { EventLedger } from "./services/event-ledger-service.js";
 import { inspectServerInterfaces } from "./services/server-interface-inspector.js";
 import { probePresets, runServerDataProbe } from "./services/server-data-probe-service.js";
@@ -21,7 +22,7 @@ const provider = initialMode === AppMode.CONNECTING
   : new DemoProvider();
 
 const platform = {
-  version: "4.7-event-ledger",
+  version: "4.8-event-tracked-live-lists",
   initialMode,
   currentMode: initialMode,
   provider,
@@ -86,6 +87,12 @@ function addInspector() {
       <button id="clearEventLedger" type="button">Clear Ledger</button>
     </div>
     <pre id="eventLedgerOutput" class="sdk-output">Waiting for execution events...</pre>
+    <p class="field-label sdk-response-label">Event-tracked live lists</p>
+    <div class="ledger-warning">Partial view only. Records that existed before this plugin connected may be missing. Management actions remain locked.</div>
+    <div class="tracked-list-heading"><strong>Tracked open positions</strong><span id="trackedOpenPositionLabel">0</span></div>
+    <div id="trackedPositionList" class="record-list"><div class="empty-state">No event-tracked open positions.</div></div>
+    <div class="tracked-list-heading"><strong>Tracked pending entry orders</strong><span id="trackedPendingOrderLabel">0</span></div>
+    <div id="trackedOrderList" class="record-list"><div class="empty-state">No event-tracked pending entry orders.</div></div>
     <p class="field-label sdk-response-label">SDK ServerInterfaces inspector</p>
     <div class="action-row">
       <button id="refreshInterfaceReport" type="button">Refresh Interface Report</button>
@@ -106,14 +113,55 @@ function addInspector() {
   stageOutput = document.getElementById("sdkStageOutput");
   document.getElementById("retrySdkConnection").onclick = connectReadOnly;
   const ledgerOutput = document.getElementById("eventLedgerOutput");
+  const escapeText = value => String(value ?? "").replace(/[&<>"']/g, character => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"})[character]);
+  const formatTrackedTimestamp = value => value ? new Date(Number(value)).toLocaleString() : "Not available";
+  const formatTrackedVolume = record => {
+    const preference = window.tradePanelPreferences?.volumeDisplay || "both";
+    const units = `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(record.volumeUnits)} ${record.measurementUnits}`;
+    const lots = record.volumeLots == null ? "Lots unavailable" : `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(record.volumeLots)} lots`;
+    return preference === "units" ? units : preference === "lots" ? lots : `${units} / ${lots}`;
+  };
+  const renderTrackedLists = () => {
+    const positions = mapTrackedPositions(platform.eventLedger);
+    const orders = mapTrackedPendingOrders(platform.eventLedger);
+    document.getElementById("trackedOpenPositionLabel").textContent = String(positions.length);
+    document.getElementById("trackedPendingOrderLabel").textContent = String(orders.length);
+    document.getElementById("trackedPositionList").innerHTML = positions.length ? positions.map(position => `
+      <article class="record-card tracked-card">
+        <div class="record-header"><div><div class="record-title-row"><h3>Symbol ID ${escapeText(position.symbolId)}</h3><span class="trade-badge ${position.side.toLowerCase()}">${escapeText(position.side)}</span></div><p class="record-id">Position #${escapeText(position.id)}</p></div><span class="source-badge">Execution event</span></div>
+        <div class="details-grid">
+          <div><span>Volume</span><strong>${escapeText(formatTrackedVolume(position))}</strong></div>
+          <div><span>Entry</span><strong>${escapeText(position.entryPrice ?? "Not available")}</strong></div>
+          <div><span>Stop Loss</span><strong>${escapeText(position.stopLoss ?? "Not set")}</strong></div>
+          <div><span>Take Profit</span><strong>${escapeText(position.takeProfit ?? "Not set")}</strong></div>
+          <div><span>Commission</span><strong>${escapeText(position.commission)}</strong></div>
+          <div><span>Opened</span><strong>${escapeText(formatTrackedTimestamp(position.openTimestamp))}</strong></div>
+        </div>
+        <button type="button" disabled>Management Locked</button>
+      </article>`).join("") : '<div class="empty-state">No event-tracked open positions.</div>';
+    document.getElementById("trackedOrderList").innerHTML = orders.length ? orders.map(order => `
+      <article class="record-card tracked-card">
+        <div class="record-header"><div><div class="record-title-row"><h3>Symbol ID ${escapeText(order.symbolId)}</h3><span class="order-badge">${escapeText(order.side)} ${escapeText(order.orderType)}</span></div><p class="record-id">Order #${escapeText(order.id)}</p></div><span class="source-badge">Execution event</span></div>
+        <div class="details-grid">
+          <div><span>Volume</span><strong>${escapeText(formatTrackedVolume(order))}</strong></div>
+          <div><span>Entry</span><strong>${escapeText(order.entryPrice ?? "Not available")}</strong></div>
+          <div><span>Stop Loss</span><strong>${escapeText(order.stopLoss ?? "Not set")}</strong></div>
+          <div><span>Take Profit</span><strong>${escapeText(order.takeProfit ?? "Not set")}</strong></div>
+          <div><span>Created</span><strong>${escapeText(formatTrackedTimestamp(order.openTimestamp))}</strong></div>
+          <div><span>Source</span><strong>Execution event</strong></div>
+        </div>
+        <button type="button" disabled>Order Action Locked</button>
+      </article>`).join("") : '<div class="empty-state">No event-tracked pending entry orders.</div>';
+  };
   const renderLedger = () => {
     const report = platform.eventLedger.export();
-    document.getElementById("trackedPositionCount").textContent = String(report.positionCount);
-    document.getElementById("trackedOrderCount").textContent = String(report.orderCount);
+    const openPositions = mapTrackedPositions(platform.eventLedger);
+    const pendingOrders = mapTrackedPendingOrders(platform.eventLedger);
+    document.getElementById("trackedPositionCount").textContent = String(openPositions.length);
+    document.getElementById("trackedOrderCount").textContent = String(pendingOrders.length);
     document.getElementById("capturedEventCount").textContent = String(report.events.length);
-    ledgerOutput.textContent = report.events.length
-      ? JSON.stringify(report, null, 2)
-      : "Waiting for execution events...";
+    ledgerOutput.textContent = report.events.length ? JSON.stringify(report, null, 2) : "Waiting for execution events...";
+    renderTrackedLists();
   };
   document.getElementById("copyEventLedger").onclick = async () => {
     const text = JSON.stringify(platform.eventLedger.export(), null, 2);
@@ -261,11 +309,7 @@ async function connectReadOnly() {
       platform.lastExecutionEvent = sanitize(event);
       const result = platform.eventLedger.ingest(event);
       logger.info("Execution event received", result);
-      const report = platform.eventLedger.export();
-      document.getElementById("trackedPositionCount").textContent = String(report.positionCount);
-      document.getElementById("trackedOrderCount").textContent = String(report.orderCount);
-      document.getElementById("capturedEventCount").textContent = String(report.events.length);
-      document.getElementById("eventLedgerOutput").textContent = JSON.stringify(report, null, 2);
+      renderLedger();
     });
   } catch (error) {
     platform.currentMode = AppMode.CONNECTION_ERROR;

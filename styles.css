@@ -373,3 +373,10 @@ input, select {
 .ledger-summary strong{font-size:17px}
 #eventLedgerOutput{max-height:360px}
 @media(max-width:430px){.ledger-summary{grid-template-columns:1fr}}
+
+/* Version 4.8 event-tracked live lists */
+.tracked-list-heading{display:flex;justify-content:space-between;align-items:center;margin:14px 0 8px;color:var(--text)}
+.tracked-list-heading span{padding:3px 8px;border-radius:999px;background:rgba(47,129,247,.16);color:#79b8ff;font-size:12px}
+.tracked-card{margin-bottom:10px}
+.tracked-card>button{width:100%;margin-top:4px}
+.source-badge{padding:4px 7px;border-radius:999px;background:rgba(210,153,34,.12);color:#e3b341;font-size:10px;white-space:nowrap}

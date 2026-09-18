@@ -574,14 +574,33 @@ document.addEventListener("DOMContentLoaded", initializeDemo);
             event.stopImmediatePropagation();
             const p = state.positions.find(x => x.id === state.selectedPositionId);
             if (!p) return;
+
+            const completeClose = () => {
+                closeModal();
+                state.positions = state.positions.filter(x => x.id !== p.id);
+                refreshAll(`Demo complete: ${p.symbol} #${p.id} removed.`);
+            };
+
+            const requireConfirmation = window.tradePanelPreferences
+                ? window.tradePanelPreferences.requireCloseSelectedConfirmation !== false
+                : (() => {
+                    try {
+                        const saved = JSON.parse(localStorage.getItem("ctraderMobilePositionManager.demoSettings.v1") || "{}");
+                        return saved.requireCloseSelectedConfirmation !== false;
+                    } catch {
+                        return true;
+                    }
+                })();
+
+            if (!requireConfirmation) {
+                completeClose();
+                return;
+            }
+
             showConfirm({
                 title: "Close Selected Position",
                 body: impactBody([p]), confirmText: "Confirm Close Position",
-                onConfirm: () => {
-                    closeModal();
-                    state.positions = state.positions.filter(x => x.id !== p.id);
-                    refreshAll(`Demo complete: ${p.symbol} #${p.id} removed.`);
-                }
+                onConfirm: completeClose
             });
         }
         const partialButton = event.target.closest("#partialCloseButton");
@@ -635,8 +654,10 @@ document.addEventListener("DOMContentLoaded", initializeDemo);
     }
 
     let demoSettings = loadSettings();
+    window.tradePanelPreferences = { ...demoSettings };
 
     function saveSettings() {
+        window.tradePanelPreferences = { ...demoSettings };
         localStorage.setItem(SETTINGS_KEY, JSON.stringify(demoSettings));
     }
 
@@ -744,7 +765,14 @@ document.addEventListener("DOMContentLoaded", initializeDemo);
         document.getElementById("preset1Setting").value = demoSettings.partialPreset1;
         document.getElementById("preset2Setting").value = demoSettings.partialPreset2;
         document.getElementById("preset3Setting").value = demoSettings.partialPreset3;
-        document.getElementById("closeSelectedConfirmSetting").checked = demoSettings.requireCloseSelectedConfirmation;
+        const closeSelectedConfirmSetting = document.getElementById("closeSelectedConfirmSetting");
+        closeSelectedConfirmSetting.checked = demoSettings.requireCloseSelectedConfirmation;
+        closeSelectedConfirmSetting.addEventListener("change", () => {
+            window.tradePanelPreferences = {
+                ...(window.tradePanelPreferences || demoSettings),
+                requireCloseSelectedConfirmation: closeSelectedConfirmSetting.checked
+            };
+        });
 
         const close = () => modal.remove();
         document.getElementById("closeSettingsTop").onclick = close;
@@ -848,6 +876,15 @@ document.addEventListener("DOMContentLoaded", initializeDemo);
         if (partial) {
             partial.value = demoSettings.defaultPartialPercent;
             partial.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+        const closeSelectedButton = document.getElementById("closeSelectedButton");
+        if (closeSelectedButton) {
+            const requireCloseConfirmation = window.tradePanelPreferences
+                ? window.tradePanelPreferences.requireCloseSelectedConfirmation !== false
+                : demoSettings.requireCloseSelectedConfirmation !== false;
+            closeSelectedButton.textContent = requireCloseConfirmation
+                ? "Review Close This Position"
+                : "Close This Position";
         }
         const presetButtons = [...document.querySelectorAll(".preset-button")];
         const presets = [demoSettings.partialPreset1, demoSettings.partialPreset2, demoSettings.partialPreset3];

@@ -15,6 +15,7 @@ const logger = createDebugLogger();
 const initialMode = detectInitialMode();
 let stageOutput = null;
 let renderEventLedger = () => {};
+let renderSubscriptionMonitor = () => {};
 const provider = initialMode === AppMode.CONNECTING
   ? new CTraderProvider({
       logger,
@@ -25,7 +26,7 @@ const provider = initialMode === AppMode.CONNECTING
   : new DemoProvider();
 
 const platform = {
-  version: "5.0-symbol-quotes",
+  version: "5.0.1-monitor-scope-fix",
   initialMode,
   currentMode: initialMode,
   provider,
@@ -88,7 +89,7 @@ function addInspector() {
     <pre id="sdkOutput" class="sdk-output">Waiting for account information...</pre>
     <p class="field-label sdk-response-label">Build and subscription monitor</p>
     <div class="monitor-grid">
-      <div><span>Build</span><strong id="visibleBuildVersion">5.0-symbol-quotes</strong></div>
+      <div><span>Build</span><strong id="visibleBuildVersion">Loading...</strong></div>
       <div><span>Execution subscription</span><strong id="subscriptionState">Not started</strong></div>
       <div><span>Raw events received</span><strong id="rawEventCount">0</strong></div>
       <div><span>Market data</span><strong id="marketDataStatus">Not started</strong></div>
@@ -133,7 +134,7 @@ function addInspector() {
   document.querySelector(".app-shell").prepend(section);
   stageOutput = document.getElementById("sdkStageOutput");
   document.getElementById("retrySdkConnection").onclick = connectReadOnly;
-  const renderSubscriptionMonitor = () => {
+  renderSubscriptionMonitor = () => {
     const monitor = platform.subscriptionMonitor;
     document.getElementById("subscriptionState").textContent = monitor.state;
     document.getElementById("rawEventCount").textContent = String(monitor.rawEventCount);
@@ -141,6 +142,7 @@ function addInspector() {
     document.getElementById("subscriptionError").textContent = monitor.lastError || "None";
     document.getElementById("marketDataStatus").textContent = platform.marketDataStatus;
   };
+  document.getElementById("visibleBuildVersion").textContent = platform.version;
   renderSubscriptionMonitor();
   document.getElementById("resetSessionLedger").onclick = () => {
     clearSessionEvents();

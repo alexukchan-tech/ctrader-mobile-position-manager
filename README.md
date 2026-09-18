@@ -1,3 +1,3 @@
-# cTrader Mobile Position Manager 5.0 Symbol and Quote Mapping
+# cTrader Mobile Position Manager 5.0.1 Monitor Scope Fix
 
-This read-only build retrieves the light symbol list, loads detailed symbol definitions for event-tracked records, subscribes to their live quotes, replaces Symbol IDs with symbol names, and displays the current normalized bid. The list remains partial and every live management action remains locked.
+Fixes the market-data initialization failure caused by `renderSubscriptionMonitor` being scoped inside the inspector setup. The monitor renderer is now available to the connection workflow, and the visible build label is populated directly from the running platform version. All live management actions remain locked.

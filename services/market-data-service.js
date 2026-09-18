@@ -78,6 +78,7 @@ export class MarketDataService {
     this.lightSymbols = new Map();
     this.symbolDetails = new Map();
     this.quotes = new Map();
+    this.quoteIntegrity = new Map();
     this.subscribedIds = new Set();
     this.quoteSubscription = null;
   }
@@ -124,8 +125,33 @@ export class MarketDataService {
     const payload = findObject(event, ["payload", "quote"]) || event;
     const symbolId = readField(payload, ["symbolId", "id"]);
     if (symbolId === undefined || symbolId === null) return;
-    this.quotes.set(String(symbolId), payload);
-    this.onQuote(String(symbolId), payload);
+    const id = String(symbolId);
+    const previous = this.quotes.get(id);
+    this.quotes.set(id, payload);
+
+    const rawBid = Number(readField(payload, ["bid"]));
+    const rawAsk = Number(readField(payload, ["ask"]));
+    const bid = this.normalizeQuotePrice(id, rawBid);
+    const ask = this.normalizeQuotePrice(id, rawAsk);
+    const previousBid = previous ? this.normalizeQuotePrice(id, readField(previous, ["bid"])) : null;
+    const previousAsk = previous ? this.normalizeQuotePrice(id, readField(previous, ["ask"])) : null;
+    const basicValid = Number.isFinite(bid) && Number.isFinite(ask) && ask >= bid && bid > 0;
+    const continuityValid = !Number.isFinite(previousBid) || !Number.isFinite(previousAsk) || (
+      Math.abs(bid - previousBid) <= Math.max(5, previousBid * 0.02) &&
+      Math.abs(ask - previousAsk) <= Math.max(5, previousAsk * 0.02)
+    );
+    const priorIntegrity = this.quoteIntegrity.get(id) || { consecutiveValid: 0 };
+    this.quoteIntegrity.set(id, {
+      consecutiveValid: basicValid && continuityValid ? priorIntegrity.consecutiveValid + 1 : 0,
+      basicValid,
+      continuityValid,
+      rawBid,
+      rawAsk,
+      normalizedBid: bid,
+      normalizedAsk: ask,
+      receivedAt: Date.now()
+    });
+    this.onQuote(id, payload);
   }
 
   getSymbolName(symbolId) {
@@ -144,6 +170,10 @@ export class MarketDataService {
 
   getQuote(symbolId) {
     return this.quotes.get(String(symbolId)) || null;
+  }
+
+  getQuoteIntegrity(symbolId) {
+    return this.quoteIntegrity.get(String(symbolId)) || null;
   }
 
   normalizeQuotePrice(symbolId, rawPrice) {

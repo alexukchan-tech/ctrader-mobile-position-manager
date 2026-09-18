@@ -26,7 +26,7 @@ const provider = initialMode === AppMode.CONNECTING
   : new DemoProvider();
 
 const platform = {
-  version: "10.0.1-quote-scale-hotfix",
+  version: "11.0-quote-integrity",
   initialMode,
   currentMode: initialMode,
   provider,
@@ -118,9 +118,10 @@ function ensureValidationSummary() {
     <div><span>Symbols</span><strong id="validationSymbols">Waiting</strong></div>
     <div><span>Quotes</span><strong id="validationQuotes">Waiting</strong></div>
     <div><span>Tracked P/L</span><strong id="validationPnl">Waiting</strong></div>
-    <div><span>Release mode</span><strong>Production hotfix</strong></div>
+    <div><span>Release mode</span><strong>Quote-integrity monitoring</strong></div>
     <div><span>Data scope</span><strong id="validationScope">Partial</strong></div>
     <div><span>Quote health</span><strong id="validationQuoteHealth">Waiting</strong></div>
+    <div><span>P/L rule</span><strong>2 verified ticks required</strong></div>
     <div><span>Session health</span><strong id="validationSession">Starting</strong></div>
     <div><span>Last refresh</span><strong id="validationRefresh">Never</strong></div>
     <div><span>Storage</span><strong id="validationStorage">Checking</strong></div>
@@ -433,15 +434,36 @@ function addInspector() {
       bid = null;
       ask = null;
     }
-    const timestamp = Number(quote.timestamp || quote.utcTimestamp || Date.now());
-    const updatedAt = Number.isFinite(timestamp) ? new Date(timestamp).toLocaleTimeString() : "Unknown";
-    return { bid, ask, updatedAt, stale: Number.isFinite(timestamp) ? Date.now() - timestamp > 15000 : false };
+    const rawTimestamp = quote.timestamp || quote.utcTimestamp;
+    const timestamp = rawTimestamp == null ? null : Number(rawTimestamp);
+    const timestampValid = Number.isFinite(timestamp) && timestamp > 0;
+    const ageMs = timestampValid ? Math.max(0, Date.now() - timestamp) : null;
+    const spreadValid = Number.isFinite(bid) && Number.isFinite(ask) && ask >= bid && (ask - bid) < Math.max(1, bid * 0.01);
+    const fresh = timestampValid && ageMs <= 5000;
+    const integrity = service.getQuoteIntegrity(record.symbolId);
+    const sequenceVerified = Boolean(integrity && integrity.consecutiveValid >= 2 && integrity.basicValid && integrity.continuityValid);
+    const valid = plausible && spreadValid && fresh && sequenceVerified;
+    if (!valid) {
+      bid = null;
+      ask = null;
+    }
+    const updatedAt = timestampValid ? new Date(timestamp).toLocaleTimeString() : "Timestamp unavailable";
+    return {
+      bid,
+      ask,
+      updatedAt,
+      ageMs,
+      stale: !fresh,
+      valid,
+      reason: !plausible ? "implausible price" : !spreadValid ? "invalid spread" : !timestampValid ? "missing timestamp" : !fresh ? "stale quote" : !sequenceVerified ? "awaiting second verified tick" : null,
+      integrity
+    };
   };
 
   const estimatePositionPnl = position => {
     const quote = quoteSnapshot(position);
     const exitPrice = position.side === "Sell" ? quote.ask : quote.bid;
-    if (!Number.isFinite(exitPrice) || !Number.isFinite(Number(position.entryPrice))) {
+    if (!quote.valid || !Number.isFinite(exitPrice) || !Number.isFinite(Number(position.entryPrice))) {
       return { value: null, quote };
     }
     const movement = position.side === "Sell"
@@ -482,9 +504,9 @@ function addInspector() {
       const symbolDigitsKey = Object.keys(symbolInfo).find(key => key.toLowerCase() === "digits");
       const symbolDigits = Number(symbolDigitsKey ? symbolInfo[symbolDigitsKey] : 5);
       const formatPrice = value => Number.isFinite(Number(value)) ? Number(value).toFixed(symbolDigits) : "Waiting for quote";
-      const quoteText = estimate.quote.bid == null
-        ? "Waiting for quote"
-        : `Bid ${formatPrice(estimate.quote.bid)} | Ask ${formatPrice(estimate.quote.ask)}${estimate.quote.stale ? " | STALE" : ""}`;
+      const quoteText = estimate.quote.valid
+        ? `Bid ${formatPrice(estimate.quote.bid)} | Ask ${formatPrice(estimate.quote.ask)}`
+        : `Unavailable${estimate.quote.reason ? ` (${estimate.quote.reason})` : ""}`;
       const pnlText = Number.isFinite(estimate.value)
         ? `${estimate.value >= 0 ? "+" : ""}${new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(estimate.value)}`
         : "Unavailable";

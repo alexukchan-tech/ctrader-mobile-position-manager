@@ -1,6 +1,8 @@
-# Version 10.0.1 Quote Scale Hotfix
+# Version 11.0 Quote Integrity
 
-- Fixed quote scaling from raw integer values using the cTrader fixed factor of 100,000.
-- Added quote plausibility guardrails against tracked entry price.
-- Invalid or implausible quotes now show as unavailable rather than producing an estimated P/L.
-- Monitoring remains partial and read-only.
+- Requires two consecutive verified ticks before calculating P/L.
+- Detects unrealistic jumps between consecutive normalized quotes.
+- Retains the fixed 100,000 quote divisor.
+- Retains five-second freshness, timestamp, spread and entry-price checks.
+- Exposes raw and normalized quote values in monitoring snapshots for diagnosis.
+- Suppresses P/L while a quote sequence is unverified.

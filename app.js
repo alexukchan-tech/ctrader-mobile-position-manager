@@ -608,3 +608,257 @@ document.addEventListener("DOMContentLoaded", initializeDemo);
 
     refreshAll();
 })();
+
+
+// Demo v3: pending-order details and local browser preferences.
+(function enableDemoV3() {
+    const SETTINGS_KEY = "ctraderMobilePositionManager.demoSettings.v1";
+    const defaultSettings = {
+        volumeDisplay: "both",
+        defaultBeBuffer: 0,
+        defaultBeUnit: "pips",
+        defaultPartialPercent: 25,
+        partialPreset1: 25,
+        partialPreset2: 50,
+        partialPreset3: 75,
+        requireCloseSelectedConfirmation: true,
+        requireTypedCloseAll: true
+    };
+
+    function loadSettings() {
+        try {
+            const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}");
+            return { ...defaultSettings, ...saved };
+        } catch {
+            return { ...defaultSettings };
+        }
+    }
+
+    let demoSettings = loadSettings();
+
+    function saveSettings() {
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(demoSettings));
+    }
+
+    function addSettingsButton() {
+        if (document.getElementById("settingsButton")) return;
+        const header = document.querySelector(".app-header");
+        const status = document.getElementById("connectionStatus");
+        const group = document.createElement("div");
+        group.className = "header-actions";
+        status.replaceWith(group);
+        group.appendChild(status);
+        const button = document.createElement("button");
+        button.id = "settingsButton";
+        button.className = "settings-button";
+        button.type = "button";
+        button.textContent = "Settings";
+        group.appendChild(button);
+        button.addEventListener("click", openSettings);
+    }
+
+    function closeNamedModal(id) {
+        document.getElementById(id)?.remove();
+    }
+
+    function openSettings() {
+        closeNamedModal("settingsModal");
+        const modal = document.createElement("div");
+        modal.id = "settingsModal";
+        modal.className = "modal-backdrop";
+        modal.innerHTML = `
+            <section class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+                <div class="modal-header">
+                    <div>
+                        <p class="eyebrow">Demo Preferences</p>
+                        <h2 id="settingsTitle">Settings</h2>
+                    </div>
+                    <button class="icon-button" id="closeSettingsTop" type="button" aria-label="Close settings">×</button>
+                </div>
+
+                <div class="management-block">
+                    <h3>Display</h3>
+                    <label class="field-label" for="volumeDisplaySetting">Volume display</label>
+                    <select id="volumeDisplaySetting">
+                        <option value="units">Units</option>
+                        <option value="lots">Lots</option>
+                        <option value="both">Units and lots</option>
+                    </select>
+                </div>
+
+                <div class="management-block">
+                    <h3>Breakeven Defaults</h3>
+                    <div class="form-row">
+                        <label for="defaultBeBufferSetting">Buffer</label>
+                        <input id="defaultBeBufferSetting" type="number" min="0" step="0.1" inputmode="decimal">
+                        <select id="defaultBeUnitSetting" aria-label="Default breakeven unit">
+                            <option value="pips">Pips</option>
+                            <option value="r">R</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="management-block">
+                    <h3>Partial Close Defaults</h3>
+                    <label class="field-label" for="defaultPartialSetting">Default percentage</label>
+                    <input id="defaultPartialSetting" type="number" min="1" max="99" step="1" inputmode="numeric">
+                    <div class="settings-preset-grid">
+                        <label>Preset 1<input id="preset1Setting" type="number" min="1" max="99"></label>
+                        <label>Preset 2<input id="preset2Setting" type="number" min="1" max="99"></label>
+                        <label>Preset 3<input id="preset3Setting" type="number" min="1" max="99"></label>
+                    </div>
+                </div>
+
+                <div class="management-block">
+                    <h3>Safety</h3>
+                    <label class="check-row">
+                        <input id="closeSelectedConfirmSetting" type="checkbox">
+                        <span>Require confirmation before closing a selected position</span>
+                    </label>
+                    <label class="check-row locked-setting">
+                        <input type="checkbox" checked disabled>
+                        <span>Review before partial close, permanently enabled</span>
+                    </label>
+                    <label class="check-row locked-setting">
+                        <input id="typedCloseAllSetting" type="checkbox" checked disabled>
+                        <span>Type CLOSE ALL for account-wide close, permanently enabled</span>
+                    </label>
+                </div>
+
+                <p class="settings-note">
+                    Demo preferences are stored only in this browser. No account credentials, live prices,
+                    positions, orders, or executable instructions are stored.
+                </p>
+
+                <div class="action-row">
+                    <button id="resetSettingsButton" type="button">Reset Defaults</button>
+                    <button id="saveSettingsButton" class="primary-button" type="button">Save Settings</button>
+                </div>
+            </section>`;
+        document.body.appendChild(modal);
+
+        document.getElementById("volumeDisplaySetting").value = demoSettings.volumeDisplay;
+        document.getElementById("defaultBeBufferSetting").value = demoSettings.defaultBeBuffer;
+        document.getElementById("defaultBeUnitSetting").value = demoSettings.defaultBeUnit;
+        document.getElementById("defaultPartialSetting").value = demoSettings.defaultPartialPercent;
+        document.getElementById("preset1Setting").value = demoSettings.partialPreset1;
+        document.getElementById("preset2Setting").value = demoSettings.partialPreset2;
+        document.getElementById("preset3Setting").value = demoSettings.partialPreset3;
+        document.getElementById("closeSelectedConfirmSetting").checked = demoSettings.requireCloseSelectedConfirmation;
+
+        const close = () => modal.remove();
+        document.getElementById("closeSettingsTop").onclick = close;
+        modal.addEventListener("click", event => { if (event.target === modal) close(); });
+
+        document.getElementById("resetSettingsButton").onclick = () => {
+            demoSettings = { ...defaultSettings };
+            saveSettings();
+            close();
+            openSettings();
+        };
+
+        document.getElementById("saveSettingsButton").onclick = () => {
+            const clampPercent = value => Math.min(99, Math.max(1, Math.round(Number(value) || 1)));
+            demoSettings = {
+                ...demoSettings,
+                volumeDisplay: document.getElementById("volumeDisplaySetting").value,
+                defaultBeBuffer: Math.max(0, Number(document.getElementById("defaultBeBufferSetting").value) || 0),
+                defaultBeUnit: document.getElementById("defaultBeUnitSetting").value,
+                defaultPartialPercent: clampPercent(document.getElementById("defaultPartialSetting").value),
+                partialPreset1: clampPercent(document.getElementById("preset1Setting").value),
+                partialPreset2: clampPercent(document.getElementById("preset2Setting").value),
+                partialPreset3: clampPercent(document.getElementById("preset3Setting").value),
+                requireCloseSelectedConfirmation: document.getElementById("closeSelectedConfirmSetting").checked,
+                requireTypedCloseAll: true
+            };
+            saveSettings();
+            close();
+            window.alert("Demo preferences saved in this browser.");
+        };
+    }
+
+    const previousRenderPendingOrders = renderPendingOrders;
+    renderPendingOrders = function renderPendingOrdersV3() {
+        previousRenderPendingOrders();
+        document.querySelectorAll("#ordersList .record-card").forEach((card, index) => {
+            const order = state.pendingOrders[index];
+            if (!order || card.querySelector(".view-order-button")) return;
+            const note = card.querySelector(".read-only-note");
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "secondary-button view-order-button";
+            button.dataset.orderId = order.id;
+            button.textContent = "View Order Details";
+            note?.replaceWith(button);
+            button.addEventListener("click", () => openPendingOrderDetails(order.id));
+        });
+    };
+
+    function openPendingOrderDetails(orderId) {
+        const order = state.pendingOrders.find(item => item.id === orderId);
+        if (!order) return;
+        closeNamedModal("pendingOrderModal");
+        const modal = document.createElement("div");
+        modal.id = "pendingOrderModal";
+        modal.className = "modal-backdrop";
+        modal.innerHTML = `
+            <section class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="pendingOrderTitle">
+                <div class="modal-header">
+                    <div>
+                        <p class="eyebrow">Pending Order</p>
+                        <h2 id="pendingOrderTitle">${escapeHtml(order.symbol)} ${escapeHtml(order.type)}</h2>
+                        <p class="record-id">Order #${escapeHtml(order.id)}</p>
+                    </div>
+                    <button class="icon-button" id="closePendingOrderTop" type="button" aria-label="Close order details">×</button>
+                </div>
+
+                <div class="details-grid modal-details">
+                    <div><span>Volume</span><strong>${formatNumber(order.volumeUnits, 0)} units</strong></div>
+                    <div><span>Lots</span><strong>${formatNumber(order.volumeLots, 2)}</strong></div>
+                    <div><span>Entry</span><strong>${formatNumber(order.entryPrice)}</strong></div>
+                    <div><span>Current</span><strong>${formatNumber(order.currentPrice)}</strong></div>
+                    <div><span>Stop Loss</span><strong>${order.stopLoss == null ? "Not set" : formatNumber(order.stopLoss)}</strong></div>
+                    <div><span>Take Profit</span><strong>${order.takeProfit == null ? "Not set" : formatNumber(order.takeProfit)}</strong></div>
+                    <div><span>Distance</span><strong>${formatNumber(order.distancePips, 1)} pips</strong></div>
+                    <div><span>Created</span><strong>${escapeHtml(order.createdAt)}</strong></div>
+                    <div><span>Expiration</span><strong>${escapeHtml(order.expiration)}</strong></div>
+                    <div><span>Label</span><strong>${escapeHtml(order.label || "None")}</strong></div>
+                </div>
+
+                <div class="read-only-panel">
+                    <strong>Read-only in Version 1</strong>
+                    Pending-order cancellation and modification are intentionally excluded from the initial mobile scope.
+                </div>
+            </section>`;
+        document.body.appendChild(modal);
+        const close = () => modal.remove();
+        document.getElementById("closePendingOrderTop").onclick = close;
+        modal.addEventListener("click", event => { if (event.target === modal) close(); });
+    }
+
+    // Apply saved defaults each time the existing position manager opens.
+    const previousOpenPositionManager = openPositionManager;
+    openPositionManager = function openPositionManagerV3(positionId) {
+        previousOpenPositionManager(positionId);
+        const beBuffer = document.getElementById("beBuffer");
+        const beUnit = document.getElementById("beUnit");
+        const partial = document.getElementById("partialClosePercent");
+        if (beBuffer) beBuffer.value = demoSettings.defaultBeBuffer;
+        if (beUnit) beUnit.value = demoSettings.defaultBeUnit;
+        if (partial) {
+            partial.value = demoSettings.defaultPartialPercent;
+            partial.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+        const presetButtons = [...document.querySelectorAll(".preset-button")];
+        const presets = [demoSettings.partialPreset1, demoSettings.partialPreset2, demoSettings.partialPreset3];
+        presetButtons.forEach((button, index) => {
+            if (presets[index] != null) {
+                button.dataset.percent = String(presets[index]);
+                button.textContent = `${presets[index]}%`;
+            }
+        });
+    };
+
+    addSettingsButton();
+    renderPendingOrders();
+})();

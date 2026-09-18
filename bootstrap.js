@@ -1,3 +1,4 @@
+import { loadSessionEvents, saveSessionEvents, clearSessionEvents } from "./services/session-event-store.js";
 import { mapTrackedPositions, mapTrackedPendingOrders } from "./services/event-list-mapper.js";
 import { EventLedger } from "./services/event-ledger-service.js";
 import { inspectServerInterfaces } from "./services/server-interface-inspector.js";
@@ -23,7 +24,7 @@ const provider = initialMode === AppMode.CONNECTING
   : new DemoProvider();
 
 const platform = {
-  version: "4.8.1-ledger-render-fix",
+  version: "4.9-subscription-monitor",
   initialMode,
   currentMode: initialMode,
   provider,
@@ -36,7 +37,13 @@ const platform = {
   connectionError: null,
   discoveryService: null,
   discoveryCaptures: [],
-  eventLedger: new EventLedger({ maximumEvents: 100 })
+  eventLedger: new EventLedger({ maximumEvents: 100 }),
+  subscriptionMonitor: {
+    state: "Not started",
+    rawEventCount: 0,
+    lastEventAt: null,
+    lastError: null
+  }
 };
 window.positionManagerPlatform = platform;
 
@@ -76,6 +83,15 @@ function addInspector() {
     <pre id="sdkStageOutput" class="sdk-output sdk-stage-output">Preparing connection...</pre>
     <p class="field-label sdk-response-label">Sanitized account response</p>
     <pre id="sdkOutput" class="sdk-output">Waiting for account information...</pre>
+    <p class="field-label sdk-response-label">Build and subscription monitor</p>
+    <div class="monitor-grid">
+      <div><span>Build</span><strong id="visibleBuildVersion">4.9-subscription-monitor</strong></div>
+      <div><span>Execution subscription</span><strong id="subscriptionState">Not started</strong></div>
+      <div><span>Raw events received</span><strong id="rawEventCount">0</strong></div>
+      <div><span>Last event received</span><strong id="lastRawEventAt">Never</strong></div>
+      <div class="monitor-wide"><span>Subscription error</span><strong id="subscriptionError">None</strong></div>
+    </div>
+    <button id="resetSessionLedger" type="button" class="secondary-button">Reset Session Ledger</button>
     <p class="field-label sdk-response-label">Execution Event Ledger</p>
     <div class="ledger-warning">Initial account snapshot unavailable. The ledger includes only positions and orders observed in execution events after this plugin instance connected.</div>
     <div class="ledger-summary">
@@ -113,6 +129,29 @@ function addInspector() {
   document.querySelector(".app-shell").prepend(section);
   stageOutput = document.getElementById("sdkStageOutput");
   document.getElementById("retrySdkConnection").onclick = connectReadOnly;
+  const renderSubscriptionMonitor = () => {
+    const monitor = platform.subscriptionMonitor;
+    document.getElementById("subscriptionState").textContent = monitor.state;
+    document.getElementById("rawEventCount").textContent = String(monitor.rawEventCount);
+    document.getElementById("lastRawEventAt").textContent = monitor.lastEventAt || "Never";
+    document.getElementById("subscriptionError").textContent = monitor.lastError || "None";
+  };
+  renderSubscriptionMonitor();
+  document.getElementById("resetSessionLedger").onclick = () => {
+    clearSessionEvents();
+    platform.eventLedger.clear();
+    platform.subscriptionMonitor.rawEventCount = 0;
+    platform.subscriptionMonitor.lastEventAt = null;
+    platform.subscriptionMonitor.lastError = null;
+    renderSubscriptionMonitor();
+    renderEventLedger();
+  };
+
+  const restoredEvents = loadSessionEvents();
+  restoredEvents.forEach(event => platform.eventLedger.ingest(event));
+  platform.subscriptionMonitor.rawEventCount = restoredEvents.length;
+  if (restoredEvents.length) platform.subscriptionMonitor.lastEventAt = "Restored from session";
+
   const ledgerOutput = document.getElementById("eventLedgerOutput");
   const escapeText = value => String(value ?? "").replace(/[&<>"']/g, character => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"})[character]);
   const formatTrackedTimestamp = value => value ? new Date(Number(value)).toLocaleString() : "Not available";
@@ -182,10 +221,12 @@ function addInspector() {
     }
   };
   document.getElementById("clearEventLedger").onclick = () => {
+    clearSessionEvents();
     platform.eventLedger.clear();
     renderEventLedger();
   };
   renderEventLedger();
+  renderSubscriptionMonitor();
 
   const interfaceOutput = document.getElementById("sdkInterfaceOutput");
   const renderInterfaceReport = () => {
@@ -306,12 +347,32 @@ async function connectReadOnly() {
     copy.disabled = false;
     copy.removeAttribute("disabled");
     copy.setAttribute("aria-disabled", "false");
-    provider.subscribeToExecutionEvents(event => {
-      platform.lastExecutionEvent = sanitize(event);
-      const result = platform.eventLedger.ingest(event);
-      logger.info("Execution event received", result);
-      renderEventLedger();
-    });
+    platform.subscriptionMonitor.state = "Starting";
+    platform.subscriptionMonitor.lastError = null;
+    renderSubscriptionMonitor();
+    try {
+      provider.subscribeToExecutionEvents(event => {
+        platform.subscriptionMonitor.rawEventCount += 1;
+        platform.subscriptionMonitor.lastEventAt = new Date().toISOString();
+        platform.subscriptionMonitor.state = "Active";
+        renderSubscriptionMonitor();
+
+        platform.lastExecutionEvent = sanitize(event);
+        const storedEvents = loadSessionEvents();
+        storedEvents.push(event);
+        saveSessionEvents(storedEvents);
+        const result = platform.eventLedger.ingest(event);
+        logger.info("Execution event received", result);
+        renderEventLedger();
+      });
+      platform.subscriptionMonitor.state = "Active";
+      renderSubscriptionMonitor();
+    } catch (subscriptionError) {
+      platform.subscriptionMonitor.state = "Error";
+      platform.subscriptionMonitor.lastError = String(subscriptionError?.message || subscriptionError);
+      renderSubscriptionMonitor();
+      throw subscriptionError;
+    }
   } catch (error) {
     platform.currentMode = AppMode.CONNECTION_ERROR;
     platform.connectionError = String(error?.message || error);

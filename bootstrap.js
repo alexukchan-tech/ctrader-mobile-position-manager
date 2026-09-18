@@ -1,3 +1,4 @@
+import { inspectServerInterfaces } from "./services/server-interface-inspector.js";
 import { probePresets, runServerDataProbe } from "./services/server-data-probe-service.js";
 import { DemoProvider } from "./services/demo-provider.js";
 import { CTraderProvider } from "./services/ctrader-provider.js";
@@ -19,7 +20,7 @@ const provider = initialMode === AppMode.CONNECTING
   : new DemoProvider();
 
 const platform = {
-  version: "4.5.1-bootstrap-fix",
+  version: "4.6-interface-inspector",
   initialMode,
   currentMode: initialMode,
   provider,
@@ -71,6 +72,12 @@ function addInspector() {
     <pre id="sdkStageOutput" class="sdk-output sdk-stage-output">Preparing connection...</pre>
     <p class="field-label sdk-response-label">Sanitized account response</p>
     <pre id="sdkOutput" class="sdk-output">Waiting for account information...</pre>
+    <p class="field-label sdk-response-label">SDK ServerInterfaces inspector</p>
+    <div class="action-row">
+      <button id="refreshInterfaceReport" type="button">Refresh Interface Report</button>
+      <button id="copyInterfaceReport" type="button">Copy Interface Report</button>
+    </div>
+    <pre id="sdkInterfaceOutput" class="sdk-output">Inspecting ServerInterfaces...</pre>
     <p class="field-label sdk-response-label">Read-only getServerData probe</p>
     <select id="serverDataPreset"></select>
     <textarea id="serverDataPayload" class="sdk-probe-input" rows="3" spellcheck="false">{}</textarea>
@@ -84,6 +91,32 @@ function addInspector() {
   document.querySelector(".app-shell").prepend(section);
   stageOutput = document.getElementById("sdkStageOutput");
   document.getElementById("retrySdkConnection").onclick = connectReadOnly;
+  const interfaceOutput = document.getElementById("sdkInterfaceOutput");
+  const renderInterfaceReport = () => {
+    const report = inspectServerInterfaces();
+    platform.serverInterfaceReport = report;
+    interfaceOutput.textContent = JSON.stringify(report, null, 2);
+  };
+  document.getElementById("refreshInterfaceReport").onclick = renderInterfaceReport;
+  document.getElementById("copyInterfaceReport").onclick = async () => {
+    const report = JSON.stringify(platform.serverInterfaceReport || inspectServerInterfaces(), null, 2);
+    try {
+      await navigator.clipboard.writeText(report);
+      document.getElementById("copyInterfaceReport").textContent = "Copied";
+    } catch {
+      const blob = new Blob([report], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "ctrader-server-interfaces.json";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    }
+  };
+  renderInterfaceReport();
+
   const discoveryOutput = document.getElementById("sdkDiscoveryOutput");
   const presetSelect = document.getElementById("serverDataPreset");
   const payloadInput = document.getElementById("serverDataPayload");
